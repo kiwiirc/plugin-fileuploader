@@ -1,0 +1,9 @@
+/vendor/
+/uploads/
+
+# build artifacts
+/debug
+/fileuploader
+
+# editor cruft
+/.vscode/
