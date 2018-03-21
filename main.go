@@ -21,7 +21,7 @@ func main() {
 	/* router.Use(func(c *gin.Context) {
 		fmt.Println("debug me")
 	}) */
-	tusGroup := router.Group("/files")
+	// tusGroup := router.Group("/files")
 	// tusGroup.Use(cors.New(cors.Config{
 	// 	AllowOrigins: []string{"http://127.0.0.1:8080"},
 	// 	AllowHeaders: []string{
@@ -33,7 +33,7 @@ func main() {
 	// 	},
 	// 	AllowMethods: []string{ /* "GET", "POST", "PUT", "HEAD", */ "PATCH"},
 	// }))
-	err = registerTusHandlers(tusGroup, router)
+	err = registerTusHandlers(router)
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +43,7 @@ func main() {
 	router.Run("127.0.0.1:8088")
 }
 
-func makeTusHandler() *tusd.Handler {
+/* func makeTusHandler() *tusd.Handler {
 	store := filestore.FileStore{
 		Path: "./uploads",
 	}
@@ -59,9 +59,9 @@ func makeTusHandler() *tusd.Handler {
 		panic(fmt.Errorf("Unable to create handler: %s", err))
 	}
 	return handler
-}
+} */
 
-func registerTusHandlers(rg *gin.RouterGroup, r *gin.Engine) error {
+func registerTusHandlers(r *gin.Engine) error {
 	store := filestore.FileStore{
 		Path: "./uploads",
 	}
@@ -84,6 +84,8 @@ func registerTusHandlers(rg *gin.RouterGroup, r *gin.Engine) error {
 	})
 
 	r.Use(gin.WrapH(handler.Middleware(noopHandler)))
+
+	rg := r.Group("/files")
 
 	// routedHandler.Handler = handler.Middleware(mux)
 
