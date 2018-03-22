@@ -1,2 +1,4 @@
 /vendor/
 /uploads/
+/debug
+/fileuploader
