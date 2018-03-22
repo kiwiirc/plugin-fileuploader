@@ -38,5 +38,9 @@
   unused-packages = true
 
 [[constraint]]
-  name = "github.com/gin-contrib/cors"
+  name = "github.com/caarlos0/env"
+  version = "3.2.0"
+
+[[constraint]]
+  name = "github.com/joho/godotenv"
   version = "1.2.0"
