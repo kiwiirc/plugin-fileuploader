@@ -5,14 +5,12 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kiwiirc/fileuploader/shardedfilestore"
 	"github.com/tus/tusd"
-	"github.com/tus/tusd/filestore"
 )
 
 func registerTusHandlers(prefix string, r *gin.Engine) error {
-	store := filestore.FileStore{
-		Path: "./uploads",
-	}
+	store := shardedfilestore.New("./uploads", 6)
 
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
