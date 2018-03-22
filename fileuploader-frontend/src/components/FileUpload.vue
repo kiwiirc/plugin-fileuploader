@@ -1,22 +1,20 @@
 <template>
-	<div class="file-upload">
-		<div
-			class="drop-zone"
-			v-on:dragenter="dragenter"
-			v-on:dragover="dragover"
-			v-on:dragleave="dragleave"
-			v-on:drop="drop"
-			v-bind:class="{ 'drop-hover': isDropHovered }"
-		>
-			Drop a file here
-		</div>
+	<div
+		class="drop-zone"
+		v-on:dragenter.prevent
+		v-on:dragover.prevent
+		v-on:dragleave="dragleave"
+		v-on:drop.prevent="drop"
+		v-bind:class="{ 'drop-hover': isDropHovered }"
+	>
+		<span class="drop-message">Drop a file anywhere</span>
 	</div>
 </template>
 
 <script>
 import tus from 'tus-js-client'
 
-function mustUnwrapSingle(list) {
+function unwrapSingle(list) {
 	if (list.length !== 1) {
 		throw new TypeError(`expected length 1, got ${list.length}`)
 	}
@@ -63,22 +61,27 @@ export default {
 	data: () => ({
 		isDropHovered: false
 	}),
+	created() {
+		window.addEventListener('dragenter', this.windowDragenter)
+		// window.addEventListener('dragleave', this.windowDragleave)
+	},
+	destroyed() {
+		window.removeEventListener('dragenter', this.windowDragenter)
+		// window.removeEventListener('dragleave', this.windowDragleave)
+	},
 	methods: {
-		dragenter(event) {
+		windowDragenter(event) {
 			this.isDropHovered = true
-			event.preventDefault()
 		},
-		dragover(event) {
-			event.preventDefault()
-		},
-		dragleave() {
+		// windowDragleave(event) {
+		// 	this.isWindowDropHovered = false
+		// },
+		dragleave(event) {
 			this.isDropHovered = false
 		},
 		drop(event) {
-			event.preventDefault()
 			this.isDropHovered = false
-			const { files } = event.dataTransfer
-			const file = mustUnwrapSingle(files)
+			const file = unwrapSingle(event.dataTransfer.files)
 			// const upload = new tus.Upload(file, tusOptions)
 			const upload = new tus.Upload(file, {
 				endpoint: "http://localhost:8088/files",
@@ -104,13 +107,32 @@ export default {
 }
 </script>
 
+<style>
+html, body {
+	min-height: 100%;
+}
+</style>
+
 <style scoped>
 .drop-zone {
-	width: 50vmin;
-	height: 50vmin;
-	border: 1px solid #d6d3d3;
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	font-size: 5em;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	background-color: rgba(192, 192, 192, 0.8);
+}
+.drop-zone * {
+	/* prevents drags over child elements from triggering dragleave on the
+	.drop-zone element. an alternative would be to use a counting semaphore
+	controlled by enters and leaves at every level to hold the overlay enabled */
+	pointer-events: none;
 }
 .drop-hover {
-	border: 1px dashed red;
+	display: flex;
 }
 </style>
