@@ -9,14 +9,16 @@ import (
 	"github.com/tus/tusd"
 )
 
-func registerTusHandlers(prefix string, r *gin.Engine) error {
-	store := shardedfilestore.New("./uploads", 6)
+const tusRoutePrefix = "/files"
+
+func (serv *UploadServer) registerTusHandlers(r *gin.Engine) error {
+	store := shardedfilestore.New(serv.cfg.StoragePath, serv.cfg.StorageShardLayers)
 
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
 
 	config := tusd.Config{
-		BasePath:      prefix,
+		BasePath:      tusRoutePrefix,
 		StoreComposer: composer,
 	}
 
@@ -33,7 +35,7 @@ func registerTusHandlers(prefix string, r *gin.Engine) error {
 	// When attached to the RouterGroup, it does not get called for some requests.
 	r.Use(gin.WrapH(handler.Middleware(noopHandler)))
 
-	rg := r.Group(prefix)
+	rg := r.Group(tusRoutePrefix)
 	rg.POST("", gin.WrapF(handler.PostFile))
 	rg.HEAD(":id", gin.WrapF(handler.HeadFile))
 	rg.PATCH(":id", gin.WrapF(handler.PatchFile))

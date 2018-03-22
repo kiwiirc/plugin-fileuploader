@@ -8,10 +8,10 @@
   revision = "6226ea591a40176dd3ff9cd8eff81ed6ca721a00"
 
 [[projects]]
-  name = "github.com/gin-contrib/cors"
+  name = "github.com/caarlos0/env"
   packages = ["."]
-  revision = "cf4846e6a636a76237a28d9286f163c132e841bc"
-  version = "v1.2"
+  revision = "7cd7992b3bc86f920394f8de92c13900da1a46b7"
+  version = "v3.2.0"
 
 [[projects]]
   branch = "master"
@@ -36,6 +36,12 @@
   version = "v1.0.0"
 
 [[projects]]
+  name = "github.com/joho/godotenv"
+  packages = ["."]
+  revision = "a79fa1e548e2c689c241d10173efd51e5d689d5b"
+  version = "v1.2.0"
+
+[[projects]]
   name = "github.com/mattn/go-isatty"
   packages = ["."]
   revision = "0360b2af4f38e8d38c7fce2a9f4e702702d73a39"
@@ -45,7 +51,6 @@
   name = "github.com/tus/tusd"
   packages = [
     ".",
-    "filestore",
     "uid"
   ]
   revision = "966f1d51639d3405b630e4c94c0b1d76a0f7475c"
@@ -61,7 +66,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "7ceb54c8418b8f9cdf0177b511d5cbb06e9fae39"
+  revision = "91ee8cde435411ca3f1cd365e8f20131aed4d0a1"
 
 [[projects]]
   name = "gopkg.in/Acconut/lockfile.v1"
@@ -84,6 +89,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4cd49b27eb7222b5b4224828f2b7d6648388d0ec561177486c037c5c9b972975"
+  inputs-digest = "42a020eceae0ca6a466918b4c9b10afd0cea8bbc66223187107de0af6151235c"
   solver-name = "gps-cdcl"
   solver-version = 1

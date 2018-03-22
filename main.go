@@ -1,18 +1,14 @@
 package main
 
-import (
-	"github.com/gin-gonic/gin"
-)
-
-const storagePath = "./uploads"
+import "log"
 
 func main() {
-	router := gin.Default()
+	var serv UploadServer
 
-	err := registerTusHandlers("/files", router)
+	serv.cfg.LoadFromEnv()
+
+	err := serv.Run()
 	if err != nil {
-		panic(err)
+		log.Fatalf("Could not start upload server: %s", err)
 	}
-
-	router.Run("0.0.0.0:8088")
 }
