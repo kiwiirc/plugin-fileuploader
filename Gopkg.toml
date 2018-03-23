@@ -44,3 +44,7 @@
 [[constraint]]
   name = "github.com/joho/godotenv"
   version = "1.2.0"
+
+[[constraint]]
+  name = "github.com/mattn/go-sqlite3"
+  version = "1.6.0"

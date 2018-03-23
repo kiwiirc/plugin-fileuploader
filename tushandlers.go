@@ -12,7 +12,7 @@ import (
 const tusRoutePrefix = "/files"
 
 func (serv *UploadServer) registerTusHandlers(r *gin.Engine) error {
-	store := shardedfilestore.New(serv.cfg.StoragePath, serv.cfg.StorageShardLayers)
+	store := shardedfilestore.New(serv.cfg.StoragePath, serv.cfg.StorageShardLayers, serv.cfg.DBPath)
 
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
