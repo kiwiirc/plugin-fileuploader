@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +11,7 @@ import (
 const tusRoutePrefix = "/files"
 
 func (serv *UploadServer) registerTusHandlers(r *gin.Engine) error {
-	store := shardedfilestore.New(serv.cfg.StoragePath, serv.cfg.StorageShardLayers)
+	store := shardedfilestore.New(serv.cfg.StoragePath, serv.cfg.StorageShardLayers, serv.cfg.DBPath)
 
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
@@ -27,9 +26,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine) error {
 		return err
 	}
 
-	noopHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("noop handler")
-	})
+	noopHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
 	// For unknown reasons, this middleware must be mounted on the top level router.
 	// When attached to the RouterGroup, it does not get called for some requests.

@@ -13,6 +13,7 @@ type UploadServerConfig struct {
 	ListenAddr         string `env:"LISTEN_ADDR"          envDefault:"127.0.0.1:8088"`
 	StoragePath        string `env:"STORAGE_PATH"         envDefault:"./uploads"`
 	StorageShardLayers int    `env:"STORAGE_SHARD_LAYERS" envDefault:"6"`
+	DBPath             string `env:"DATABASE_PATH"        envDefault:"./uploads.db"`
 }
 
 // LoadFromEnv populates the config from the process environment and .env file

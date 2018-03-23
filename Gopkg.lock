@@ -48,6 +48,12 @@
   version = "v0.0.3"
 
 [[projects]]
+  name = "github.com/mattn/go-sqlite3"
+  packages = ["."]
+  revision = "6c771bb9887719704b210e87e934f08be014bdb1"
+  version = "v1.6.0"
+
+[[projects]]
   name = "github.com/tus/tusd"
   packages = [
     ".",
@@ -66,7 +72,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "91ee8cde435411ca3f1cd365e8f20131aed4d0a1"
+  revision = "378d26f46672a356c46195c28f61bdb4c0a781dd"
 
 [[projects]]
   name = "gopkg.in/Acconut/lockfile.v1"
@@ -83,12 +89,12 @@
 [[projects]]
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "7f97868eec74b32b0982dd158a51a446d1da7eb5"
-  version = "v2.1.1"
+  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
+  version = "v2.2.1"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "42a020eceae0ca6a466918b4c9b10afd0cea8bbc66223187107de0af6151235c"
+  inputs-digest = "88c6b02914a87b0e0cbb7296ecb087506ecdaedd80fa99641bfe7a1c7eaec6ab"
   solver-name = "gps-cdcl"
   solver-version = 1
