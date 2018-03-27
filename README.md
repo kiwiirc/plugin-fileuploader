@@ -9,7 +9,7 @@
 ```console
 $ dep ensure
 $ devrun watch "go build && ./fileuploader"
-$ cd fileuploader-frontend && yarn serve
+$ cd fileuploader-kiwiirc-plugin && yarn serve
 ```
 
 [devrun]: https://github.com/kdar/devrun
