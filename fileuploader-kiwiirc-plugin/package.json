@@ -1,19 +1,20 @@
 {
-  "name": "fileuploader-kiwiirc-plugin",
-  "version": "0.1.0",
-  "main": "plugin.js",
-  "scripts": {
-    "serve": "serve -p 44001 ."
-  },
-  "devDependencies": {
-    "babel-plugin-transform-runtime": "^6.23.0",
-    "babel-preset-es2015": "^6.24.1",
-    "parcel-bundler": "^1.6.2",
-    "parcel-plugin-vue": "^1.5.0",
-    "serve": "^6.5.3"
-  },
-  "dependencies": {
-    "uppy": "^0.23.3",
-    "vue": "^2.5.16"
-  }
+	"name": "fileuploader-kiwiirc-plugin",
+	"version": "0.1.0",
+	"main": "plugin.js",
+	"license": "UNLICENSED",
+	"private": true,
+	"scripts": {
+		"build": "parcel build",
+		"serve": "parcel serve",
+		"prepare": "yarn build",
+		"test": "xo"
+	},
+	"dependencies": {
+		"uppy": "^0.23.3"
+	},
+	"devDependencies": {
+		"parcel-bundler": "^1.6.2",
+		"xo": "^0.20.3"
+	}
 }
