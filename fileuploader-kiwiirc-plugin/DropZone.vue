@@ -4,7 +4,7 @@
 		v-on:dragenter.prevent
 		v-on:dragover.prevent
 		v-on:dragleave="dragleave"
-		v-on:drop.prevent="drop"
+		v-on:drop="drop"
 		v-bind:class="{ 'drop-hover': isDropHovered }"
 	>
 		<span class="drop-message">Drop a file anywhere</span>
@@ -12,7 +12,8 @@
 </template>
 
 <script>
-// import tus from 'tus-js-client'
+/*
+import tus from 'tus-js-client'
 
 function unwrapSingle(list) {
 	if (list.length !== 1) {
@@ -20,6 +21,7 @@ function unwrapSingle(list) {
 	}
 	return list[0]
 }
+*/
 
 // const tusOptions = {
 // 	endpoint: 'http://127.0.0.1:8088/files',
@@ -56,7 +58,7 @@ function unwrapSingle(list) {
 // }
 
 export default {
-	name: 'FileUpload',
+	name: 'DropZone',
 	props: {},
 	data: () => ({
 		isDropHovered: false
@@ -81,6 +83,7 @@ export default {
 		},
 		drop(event) {
 			this.isDropHovered = false
+			/*
 			const file = unwrapSingle(event.dataTransfer.files)
 			// const upload = new tus.Upload(file, tusOptions)
 			const upload = new tus.Upload(file, {
@@ -102,6 +105,7 @@ export default {
 				}
 			})
 			upload.start()
+			*/
 		}
 	}
 }
