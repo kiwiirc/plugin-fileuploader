@@ -4,12 +4,6 @@ import Tus from 'uppy/lib/plugins/Tus'
 import 'uppy/dist/uppy.min.css'
 
 kiwi.plugin('fileuploader', function (kiwi, log) {
-	// load stylesheet manually
-	const styles = document.createElement('link')
-	styles.rel = 'stylesheet'
-	styles.href = 'http://localhost:1234/dist/fileuploader-kiwiirc-plugin.css'
-	document.head.appendChild(styles)
-
 	// add button to input bar
 	const uploadFileButton = document.createElement('i')
 	uploadFileButton.className = 'upload-file-button fa fa-upload'
