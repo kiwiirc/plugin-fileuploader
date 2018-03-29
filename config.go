@@ -14,6 +14,7 @@ type UploadServerConfig struct {
 	StoragePath        string `env:"STORAGE_PATH"         envDefault:"./uploads"`
 	StorageShardLayers int    `env:"STORAGE_SHARD_LAYERS" envDefault:"6"`
 	DBPath             string `env:"DATABASE_PATH"        envDefault:"./uploads.db"`
+	MaximumUploadSize  int64  `env:"MAXIMUM_UPLOAD_SIZE"  envDefault:"10485760"` // 10 MiB
 }
 
 // LoadFromEnv populates the config from the process environment and .env file

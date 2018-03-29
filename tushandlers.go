@@ -11,7 +11,7 @@ import (
 const tusRoutePrefix = "/files"
 
 func (serv *UploadServer) registerTusHandlers(r *gin.Engine) error {
-	store := shardedfilestore.New(serv.cfg.StoragePath, serv.cfg.StorageShardLayers, serv.cfg.DBPath)
+	store := shardedfilestore.New(serv.cfg.StoragePath, serv.cfg.StorageShardLayers, serv.cfg.DBPath, serv.cfg.MaximumUploadSize)
 
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
@@ -19,6 +19,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine) error {
 	config := tusd.Config{
 		BasePath:      tusRoutePrefix,
 		StoreComposer: composer,
+		MaxSize:       serv.cfg.MaximumUploadSize,
 	}
 
 	handler, err := tusd.NewUnroutedHandler(config)

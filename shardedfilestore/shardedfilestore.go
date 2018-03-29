@@ -29,6 +29,7 @@ var defaultDirectoryPerm = os.FileMode(0775)
 type ShardedFileStore struct {
 	BasePath          string // Relative or absolute path to store files in.
 	PrefixShardLayers int    // Number of extra directory layers to prefix file paths with.
+	MaximumSize       int64  // Largest allowed upload size in bytes
 	db                *sql.DB
 }
 
@@ -47,7 +48,7 @@ func (store *ShardedFileStore) initDB() {
 // be used as the only storage entry. This method does not check
 // whether the path exists, use os.MkdirAll to ensure.
 // In addition, a locking mechanism is provided.
-func New(basePath string, prefixShardLayers int, dbPath string) ShardedFileStore {
+func New(basePath string, prefixShardLayers int, dbPath string, maximumSize int64) ShardedFileStore {
 	dsn := fmt.Sprintf("%s?_busy_timeout=5000&cache=shared", dbPath)
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
@@ -62,7 +63,7 @@ func New(basePath string, prefixShardLayers int, dbPath string) ShardedFileStore
 	// we also don't enable the write-ahead-log because it does not work over a
 	// networked filesystem
 
-	store := ShardedFileStore{basePath, prefixShardLayers, db}
+	store := ShardedFileStore{basePath, prefixShardLayers, maximumSize, db}
 	store.initDB()
 	return store
 }
