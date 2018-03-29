@@ -27,20 +27,13 @@ var defaultDirectoryPerm = os.FileMode(0775)
 // ShardedFileStore implements various tusd.DataStore-related interfaces.
 // See the interfaces for more documentation about the different methods.
 type ShardedFileStore struct {
-	// Relative or absolute path to store files in.
-	BasePath string
-	// Number of extra directory layers to prefix file paths with.
-	PrefixShardLayers int
+	BasePath          string // Relative or absolute path to store files in.
+	PrefixShardLayers int    // Number of extra directory layers to prefix file paths with.
+	db                *sql.DB
 }
 
-func initDB(dbPath string) {
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		log.Fatalf("Could not open database: %s", err)
-	}
-	defer db.Close()
-
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS uploads(
+func (store *ShardedFileStore) initDB() {
+	_, err := store.db.Exec(`CREATE TABLE IF NOT EXISTS uploads(
 		id TEXT PRIMARY KEY,
 		uploader_ip BLOB,
 		sha256sum BLOB
@@ -55,8 +48,28 @@ func initDB(dbPath string) {
 // whether the path exists, use os.MkdirAll to ensure.
 // In addition, a locking mechanism is provided.
 func New(basePath string, prefixShardLayers int, dbPath string) ShardedFileStore {
-	initDB(dbPath)
-	return ShardedFileStore{basePath, prefixShardLayers}
+	dsn := fmt.Sprintf("%s?_busy_timeout=5000&cache=shared", dbPath)
+	db, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		log.Fatalf("Could not open database: %s", err)
+	}
+
+	// note that we don't do db.SetMaxOpenConns(1), as we don't want to limit
+	// read concurrency unnecessarily. sqlite will handle write locking on its
+	// own, even across multiple processes accessing the same database file.
+	// https://www.sqlite.org/faq.html#q5
+
+	// we also don't enable the write-ahead-log because it does not work over a
+	// networked filesystem
+
+	store := ShardedFileStore{basePath, prefixShardLayers, db}
+	store.initDB()
+	return store
+}
+
+// Close frees the database connection pool held within ShardedFileStore
+func (store ShardedFileStore) Close() error {
+	return store.db.Close()
 }
 
 // UseIn sets this store as the core data store in the passed composer and adds
@@ -84,15 +97,8 @@ func (store ShardedFileStore) NewUpload(info tusd.FileInfo) (id string, err erro
 		return "", err
 	}
 
-	// open db connection
-	db, err := sql.Open("sqlite3", "./uploads.db")
-	if err != nil {
-		return "", err
-	}
-	defer db.Close()
-
 	// create record in uploads table
-	err = updateRow(db, `INSERT INTO uploads(id) VALUES ($1)`, id)
+	err = updateRow(store.db, `INSERT INTO uploads(id) VALUES ($1)`, id)
 	if err != nil {
 		return "", err
 	}
@@ -223,13 +229,7 @@ func (store ShardedFileStore) newLock(id string) (lockfile.Lockfile, error) {
 // lookupHash translates a randomly generated upload id into its cryptographic
 // hash by querying the upload database.
 func (store ShardedFileStore) lookupHash(id string) (hash []byte, isFinal bool, err error) {
-	db, err := sql.Open("sqlite3", "./uploads.db")
-	if err != nil {
-		return
-	}
-	defer db.Close()
-
-	row := db.QueryRow(`SELECT sha256sum FROM uploads WHERE id = $1`, id)
+	row := store.db.QueryRow(`SELECT sha256sum FROM uploads WHERE id = $1`, id)
 	err = row.Scan(&hash)
 
 	// no finalized upload exists
@@ -344,15 +344,8 @@ func (store ShardedFileStore) FinishUpload(id string) error {
 		return err
 	}
 
-	// open db connection
-	db, err := sql.Open("sqlite3", "./uploads.db")
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
 	// update hash in uploads table
-	err = updateRow(db, `
+	err = updateRow(store.db, `
 		UPDATE uploads
 		SET sha256sum = $1
 		WHERE id = $2
