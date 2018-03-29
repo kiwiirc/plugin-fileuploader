@@ -10,7 +10,17 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 
 	kiwi.addUi('input', uploadFileButton)
 
-	const uppy = Uppy({ autoProceed: false })
+	const uppy = Uppy({
+		autoProceed: false,
+		onBeforeFileAdded: (currentFile, files) => {
+			const buffer = kiwi.state.getActiveBuffer()
+			const isValidTarget = buffer.isChannel() || buffer.isQuery()
+			if (!isValidTarget) {
+				return Promise.reject('Files can only be shared in channels or queries.')
+			}
+			return Promise.resolve()
+		},
+	})
 		.use(Dashboard, { trigger: uploadFileButton })
 		.use(Tus, { endpoint: 'http://localhost:8088/files' })
 		.run()
