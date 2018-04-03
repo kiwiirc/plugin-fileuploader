@@ -31,6 +31,10 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 	})
 
 	uppy.on('upload-success', (file, resp, uploadURL) => {
+		// append filename to uploadURL
+		uploadURL = `${uploadURL}/${encodeURIComponent(file.name)}`
+		uppy.setFileState(file.id, { uploadURL })
+
 		// send a message with the url of each successful upload
 		kiwi.emit('input.raw', uploadURL)
 	})

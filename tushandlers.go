@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kiwiirc/fileuploader/shardedfilestore"
@@ -43,7 +45,15 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 
 	// GET handler requires the GetReader() method
 	if config.StoreComposer.UsesGetReader {
-		rg.GET(":id", gin.WrapF(handler.GetFile))
+		getFile := gin.WrapF(handler.GetFile)
+		rg.GET(":id", getFile)
+		rg.GET(":id/:filename", func(c *gin.Context) {
+			// rewrite request path to ":id" route pattern
+			c.Request.URL.Path = fmt.Sprintf("/files/%s", url.PathEscape(c.Param("id")))
+
+			// call the normal handler
+			getFile(c)
+		})
 	}
 
 	return nil
