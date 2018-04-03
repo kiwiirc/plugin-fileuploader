@@ -10,9 +10,7 @@ import (
 
 const tusRoutePrefix = "/files"
 
-func (serv *UploadServer) registerTusHandlers(r *gin.Engine) error {
-	store := shardedfilestore.New(serv.cfg.StoragePath, serv.cfg.StorageShardLayers, serv.cfg.DBPath, serv.cfg.MaximumUploadSize)
-
+func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfilestore.ShardedFileStore) error {
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
 
