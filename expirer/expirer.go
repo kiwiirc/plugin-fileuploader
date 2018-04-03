@@ -42,7 +42,7 @@ func (expirer *Expirer) gc(t time.Time) {
 		err = expirer.store.Terminate(id)
 		if err != nil {
 			log.Println("Failed to terminate expired upload", err)
-			return
+			continue
 		}
 		log.Println("Terminated upload id", id)
 	}
