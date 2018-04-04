@@ -18,6 +18,9 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 			}
 			return Promise.resolve()
 		},
+		restrictions: {
+			maxFileSize: 10485760, // 10 MiB
+		},
 	})
 		.use(Dashboard, { trigger: uploadFileButton })
 		.use(Webcam, { target: Dashboard })
