@@ -48,6 +48,7 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 	uppy.on('complete', result => {
 		// automatically close upload modal if all uploads succeeded
 		if (result.failed.length === 0) {
+			uppy.reset()
 			// TODO: this would be nicer with a css transition: delay, then fade out
 			uppy.getPlugin('Dashboard').closeModal()
 		}
