@@ -36,7 +36,7 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 
 	uppy.on('upload-success', (file, resp, uploadURL) => {
 		// append filename to uploadURL
-		uploadURL = `${uploadURL}/${encodeURIComponent(file.name)}`
+		uploadURL = `${uploadURL}/${encodeURIComponent(file.meta.name)}`
 		uppy.setFileState(file.id, { uploadURL })
 		file = uppy.getFile(file.id)
 
