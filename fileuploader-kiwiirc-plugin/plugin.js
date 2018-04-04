@@ -1,7 +1,4 @@
-import Uppy from 'uppy/lib/core'
-import Dashboard from 'uppy/lib/plugins/Dashboard'
-import Webcam from 'uppy/lib/plugins/Webcam'
-import Tus from 'uppy/lib/plugins/Tus'
+import { Core as Uppy, Dashboard, Webcam, Tus } from 'uppy'
 import 'uppy/dist/uppy.min.css'
 
 kiwi.plugin('fileuploader', function (kiwi, log) {
