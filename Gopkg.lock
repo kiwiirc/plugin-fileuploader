@@ -54,6 +54,15 @@
   version = "v1.6.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/rubenv/sql-migrate"
+  packages = [
+    ".",
+    "sqlparse"
+  ]
+  revision = "081fe17d19ff4e2dd9f5a0c1158e6bcf74da6906"
+
+[[projects]]
   name = "github.com/tus/tusd"
   packages = [
     ".",
@@ -72,7 +81,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "378d26f46672a356c46195c28f61bdb4c0a781dd"
+  revision = "f67933eaf9e2f750f58a234209a11ebc1107be38"
 
 [[projects]]
   name = "gopkg.in/Acconut/lockfile.v1"
@@ -87,6 +96,12 @@
   version = "v8.18.2"
 
 [[projects]]
+  name = "gopkg.in/gorp.v1"
+  packages = ["."]
+  revision = "c87af80f3cc5036b55b83d77171e156791085e2e"
+  version = "v1.7.1"
+
+[[projects]]
   name = "gopkg.in/yaml.v2"
   packages = ["."]
   revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
@@ -95,6 +110,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "88c6b02914a87b0e0cbb7296ecb087506ecdaedd80fa99641bfe7a1c7eaec6ab"
+  inputs-digest = "10dd3fb30a387a34b6348d9c87dfd0a24aa8ce1aa859a6c8ed84f063204ddab0"
   solver-name = "gps-cdcl"
   solver-version = 1

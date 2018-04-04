@@ -36,18 +36,6 @@ type ShardedFileStore struct {
 	Db                *sql.DB
 }
 
-func (store *ShardedFileStore) initDB() {
-	_, err := store.Db.Exec(`CREATE TABLE IF NOT EXISTS uploads(
-		id TEXT PRIMARY KEY,
-		uploader_ip BLOB,
-		sha256sum BLOB,
-		created_at INTEGER(8)
-	);`)
-	if err != nil {
-		log.Fatalf("Could not create database schema: %s", err)
-	}
-}
-
 // New creates a new file based storage backend. The directory specified will
 // be used as the only storage entry. This method does not check
 // whether the path exists, use os.MkdirAll to ensure.
