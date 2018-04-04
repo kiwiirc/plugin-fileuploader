@@ -1,5 +1,6 @@
 import Uppy from 'uppy/lib/core'
 import Dashboard from 'uppy/lib/plugins/Dashboard'
+import Webcam from 'uppy/lib/plugins/Webcam'
 import Tus from 'uppy/lib/plugins/Tus'
 import 'uppy/dist/uppy.min.css'
 
@@ -22,6 +23,7 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 		},
 	})
 		.use(Dashboard, { trigger: uploadFileButton })
+		.use(Webcam, { target: Dashboard })
 		.use(Tus, { endpoint: 'http://localhost:8088/files' })
 		.run()
 
