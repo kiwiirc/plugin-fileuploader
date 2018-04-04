@@ -1,6 +1,8 @@
 import { Core as Uppy, Dashboard, Webcam, Tus } from 'uppy'
 import 'uppy/dist/uppy.min.css'
 
+const GB = 2**30
+
 kiwi.plugin('fileuploader', function (kiwi, log) {
 	// add button to input bar
 	const uploadFileButton = document.createElement('i')
@@ -19,12 +21,12 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 			return Promise.resolve()
 		},
 		restrictions: {
-			maxFileSize: kiwi.state.setting('fileuploader.maxFileSize'),
+			maxFileSize: kiwi.state.setting('fileuploader.maxFileSize') || 10*GB,
 		},
 	})
 		.use(Dashboard, { trigger: uploadFileButton })
 		.use(Webcam, { target: Dashboard })
-		.use(Tus, { endpoint: kiwi.state.setting('fileuploader.server') })
+		.use(Tus, { endpoint: kiwi.state.setting('fileuploader.server') || '/files' })
 		.run()
 
 	// show uppy modal whenever a file is dragged over the page
