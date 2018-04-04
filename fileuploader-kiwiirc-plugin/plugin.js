@@ -12,7 +12,7 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 		autoProceed: false,
 		onBeforeFileAdded: (currentFile, files) => {
 			const buffer = kiwi.state.getActiveBuffer()
-			const isValidTarget = buffer.isChannel() || buffer.isQuery()
+			const isValidTarget = buffer && (buffer.isChannel() || buffer.isQuery())
 			if (!isValidTarget) {
 				return Promise.reject('Files can only be shared in channels or queries.')
 			}
