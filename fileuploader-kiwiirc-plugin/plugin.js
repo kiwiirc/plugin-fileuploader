@@ -19,12 +19,12 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 			return Promise.resolve()
 		},
 		restrictions: {
-			maxFileSize: 10485760, // 10 MiB
+			maxFileSize: kiwi.state.setting('fileuploader.maxFileSize'),
 		},
 	})
 		.use(Dashboard, { trigger: uploadFileButton })
 		.use(Webcam, { target: Dashboard })
-		.use(Tus, { endpoint: 'http://localhost:8088/files' })
+		.use(Tus, { endpoint: kiwi.state.setting('fileuploader.server') })
 		.run()
 
 	// show uppy modal whenever a file is dragged over the page
