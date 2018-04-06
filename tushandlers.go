@@ -6,7 +6,7 @@ import (
 	"net/url"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kiwiirc/fileuploader/shardedfilestore"
+	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 	"github.com/tus/tusd"
 )
 

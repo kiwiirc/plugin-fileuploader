@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/kiwiirc/fileuploader/shardedfilestore"
+	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 )
 
 type Expirer struct {

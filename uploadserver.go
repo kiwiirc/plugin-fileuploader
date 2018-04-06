@@ -2,8 +2,8 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/kiwiirc/fileuploader/expirer"
-	"github.com/kiwiirc/fileuploader/shardedfilestore"
+	"github.com/kiwiirc/plugin-fileuploader/expirer"
+	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 )
 
 // UploadServer is a simple configurable service for file sharing.
