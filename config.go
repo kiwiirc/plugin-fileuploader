@@ -11,7 +11,13 @@ import (
 
 // UploadServerConfig contains settings that control the behavior of the UploadServer
 type UploadServerConfig struct {
-	ListenAddr              string        `env:"LISTEN_ADDR"               envDefault:"127.0.0.1:8088"`
+	ListenAddr string `env:"LISTEN_ADDR" envDefault:"127.0.0.1:8088"`
+
+	// the externally reachable URL. this can differ from the listen address
+	// when using a reverse proxy. can be relative ("/files") or absolute
+	// ("https://example.com/files")
+	BasePath string `env:"BASE_PATH" envDefault:"/files"`
+
 	StoragePath             string        `env:"STORAGE_PATH"              envDefault:"./uploads"`
 	StorageShardLayers      int           `env:"STORAGE_SHARD_LAYERS"      envDefault:"6"`
 	DBPath                  string        `env:"DATABASE_PATH"             envDefault:"./uploads.db"`

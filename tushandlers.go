@@ -1,25 +1,43 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 	"github.com/tus/tusd"
 )
 
-const tusRoutePrefix = "/files"
+func routePrefixFromBasePath(basePath string) (string, error) {
+	url, err := url.Parse(basePath)
+	if err != nil {
+		return "", err
+	}
+
+	prefix := url.Path
+
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+
+	return prefix, nil
+}
 
 func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfilestore.ShardedFileStore) error {
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
 
 	config := tusd.Config{
-		BasePath:      tusRoutePrefix,
+		BasePath:      serv.cfg.BasePath,
 		StoreComposer: composer,
 		MaxSize:       serv.cfg.MaximumUploadSize,
+	}
+
+	routePrefix, err := routePrefixFromBasePath(serv.cfg.BasePath)
+	if err != nil {
+		return err
 	}
 
 	handler, err := tusd.NewUnroutedHandler(config)
@@ -33,7 +51,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	// When attached to the RouterGroup, it does not get called for some requests.
 	r.Use(gin.WrapH(handler.Middleware(noopHandler)))
 
-	rg := r.Group(tusRoutePrefix)
+	rg := r.Group(routePrefix)
 	rg.POST("", gin.WrapF(handler.PostFile))
 	rg.HEAD(":id", gin.WrapF(handler.HeadFile))
 	rg.PATCH(":id", gin.WrapF(handler.PatchFile))
@@ -49,7 +67,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 		rg.GET(":id", getFile)
 		rg.GET(":id/:filename", func(c *gin.Context) {
 			// rewrite request path to ":id" route pattern
-			c.Request.URL.Path = fmt.Sprintf("/files/%s", url.PathEscape(c.Param("id")))
+			c.Request.URL.Path = routePrefix + url.PathEscape(c.Param("id"))
 
 			// call the normal handler
 			getFile(c)
