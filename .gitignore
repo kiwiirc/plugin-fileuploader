@@ -1,6 +1,7 @@
 /vendor/
 /uploads/
 /uploads.db
+/.env
 
 # build artifacts
 /debug
