@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 	"net/url"
-	"strings"
+	"path"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
@@ -16,13 +16,32 @@ func routePrefixFromBasePath(basePath string) (string, error) {
 		return "", err
 	}
 
-	prefix := url.Path
+	return url.Path, nil
+}
 
-	if !strings.HasSuffix(prefix, "/") {
-		prefix += "/"
+func customizedCors(allowedOrigins []string) gin.HandlerFunc {
+	// convert slice values to keys of map for "contains" test
+	originSet := make(map[string]struct{}, len(allowedOrigins))
+	exists := struct{}{}
+	for _, origin := range allowedOrigins {
+		originSet[origin] = exists
 	}
 
-	return prefix, nil
+	return func(c *gin.Context) {
+		origin := c.Request.Header.Get("Origin")
+		respHeader := c.Writer.Header()
+
+		// only allow the origin if it's in the list from the config, * is not supported!
+		if _, ok := originSet[origin]; ok {
+			respHeader.Set("Access-Control-Allow-Origin", origin)
+		} else {
+			respHeader.Del("Access-Control-Allow-Origin")
+		}
+
+		// lets the user-agent know the response can vary depending on the origin of the request.
+		// ensures correct behavior of browser cache.
+		respHeader.Add("Vary", "Origin")
+	}
 }
 
 func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfilestore.ShardedFileStore) error {
@@ -49,7 +68,9 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 
 	// For unknown reasons, this middleware must be mounted on the top level router.
 	// When attached to the RouterGroup, it does not get called for some requests.
-	r.Use(gin.WrapH(handler.Middleware(noopHandler)))
+	tusdMiddleware := gin.WrapH(handler.Middleware(noopHandler))
+	r.Use(tusdMiddleware)
+	r.Use(customizedCors(serv.cfg.CorsOrigins))
 
 	rg := r.Group(routePrefix)
 	rg.POST("", gin.WrapF(handler.PostFile))
@@ -67,7 +88,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 		rg.GET(":id", getFile)
 		rg.GET(":id/:filename", func(c *gin.Context) {
 			// rewrite request path to ":id" route pattern
-			c.Request.URL.Path = routePrefix + url.PathEscape(c.Param("id"))
+			c.Request.URL.Path = path.Join(routePrefix, url.PathEscape(c.Param("id")))
 
 			// call the normal handler
 			getFile(c)

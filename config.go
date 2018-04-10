@@ -18,6 +18,9 @@ type UploadServerConfig struct {
 	// ("https://example.com/files")
 	BasePath string `env:"BASE_PATH" envDefault:"/files"`
 
+	// comma separated list of CORS Origins to allow
+	CorsOrigins []string `env:"CORS_ORIGINS" envSeparator:","`
+
 	StoragePath             string        `env:"STORAGE_PATH"              envDefault:"./uploads"`
 	StorageShardLayers      int           `env:"STORAGE_SHARD_LAYERS"      envDefault:"6"`
 	DBPath                  string        `env:"DATABASE_PATH"             envDefault:"./uploads.db"`
