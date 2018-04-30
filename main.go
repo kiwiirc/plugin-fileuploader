@@ -75,38 +75,43 @@ func runServer(reloadRequested, done chan struct{}, wg *sync.WaitGroup) {
 		<-serv.GetStartedChan()
 		log.Println("Server listening on", serv.cfg.ListenAddr)
 
-	ServerLoop:
 		// wait for error or reload request
-		for {
-			select {
+		shouldRestart := func() bool {
+			for {
+				select {
 
-			case err := <-errChan:
-				// quit if unexpected error occurred
-				if err != http.ErrServerClosed {
-					log.Fatalf("Error running upload server: %s", err)
-				}
+				case err := <-errChan:
+					// quit if unexpected error occurred
+					if err != http.ErrServerClosed {
+						log.Fatalf("Error running upload server: %s", err)
+					}
 
-				// server closed by request, exit loop to allow it to restart
-				break ServerLoop
+					// server closed by request, exit loop to allow it to restart
+					return true
 
-			case <-reloadRequested:
-				// Run in separate goroutine so we don't wait for .Shutdown()
-				// to return before starting the new server.
-				// This allows us to handle outstanding requests using the old
-				// server instance while we've already replaced it as the listener
-				// for new connections.
-				go func() {
-					log.Println("Reloading server config")
+				case <-reloadRequested:
+					// Run in separate goroutine so we don't wait for .Shutdown()
+					// to return before starting the new server.
+					// This allows us to handle outstanding requests using the old
+					// server instance while we've already replaced it as the listener
+					// for new connections.
+					go func() {
+						log.Println("Reloading server config")
+						serv.Shutdown()
+					}()
+
+				case <-done:
+					log.Println("Shutting initiated. Handling existing requests")
 					serv.Shutdown()
-				}()
+					wg.Done()
+					return false
 
-			case <-done:
-				log.Println("Shutting initiated. Handling existing requests")
-				serv.Shutdown()
-				wg.Done()
-				return
-
+				}
 			}
+		}()
+
+		if !shouldRestart {
+			return
 		}
 	}
 }
