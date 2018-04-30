@@ -41,12 +41,16 @@ func signalHandler(reloadRequested, done chan struct{}) {
 	signal.Notify(signals, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 
 	for {
-		sig := <-signals
-		switch sig {
+		switch sig := <-signals; sig {
+
 		case syscall.SIGHUP:
 			reloadRequested <- struct{}{}
-		default:
+
+		case syscall.SIGINT:
+			fallthrough
+		case syscall.SIGTERM:
 			done <- struct{}{}
+
 		}
 	}
 }
