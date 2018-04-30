@@ -8,9 +8,10 @@ import (
 )
 
 type Expirer struct {
-	ticker *time.Ticker
-	store  *shardedfilestore.ShardedFileStore
-	maxAge time.Duration
+	ticker   *time.Ticker
+	store    *shardedfilestore.ShardedFileStore
+	maxAge   time.Duration
+	quitChan chan struct{} // closes when ticker has been stopped
 }
 
 func New(store *shardedfilestore.ShardedFileStore, maxAge, checkInterval time.Duration) *Expirer {
@@ -18,15 +19,34 @@ func New(store *shardedfilestore.ShardedFileStore, maxAge, checkInterval time.Du
 		time.NewTicker(checkInterval),
 		store,
 		maxAge,
+		make(chan struct{}, 1),
 	}
 
 	go func() {
-		for t := range expirer.ticker.C {
-			expirer.gc(t)
+		for {
+			select {
+
+			// tick
+			case t := <-expirer.ticker.C:
+				expirer.gc(t)
+
+			// ticker stopped, exit the goroutine
+			case _, ok := <-expirer.quitChan:
+				if !ok {
+					return
+				}
+
+			}
 		}
 	}()
 
 	return expirer
+}
+
+// Stop turns off an Expirer. No more Filestore garbage collection cycles will start.
+func (expirer *Expirer) Stop() {
+	expirer.ticker.Stop()
+	close(expirer.quitChan)
 }
 
 func (expirer *Expirer) gc(t time.Time) {

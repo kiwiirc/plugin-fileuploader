@@ -32,7 +32,7 @@ type UploadServerConfig struct {
 // LoadFromEnv populates the config from the process environment and .env file
 func (cfg *UploadServerConfig) LoadFromEnv() {
 	// load values from .env file
-	err := godotenv.Load()
+	err := godotenv.Overload()
 	if err != nil {
 		if _, ok := err.(*os.PathError); ok {
 			log.Println("no .env file loaded")
