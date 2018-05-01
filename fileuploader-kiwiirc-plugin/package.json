@@ -7,18 +7,16 @@
 	"scripts": {
 		"build": "webpack",
 		"watch": "webpack --watch",
-		"serve": "webpack-dev-server",
-		"test": "xo"
+		"start": "webpack-dev-server"
 	},
 	"dependencies": {
-		"uppy": "^0.23.3"
+		"uppy": "^0.24.2"
 	},
 	"devDependencies": {
-		"xo": "^0.20.3",
-		"webpack": "^4.3.0",
-		"webpack-cli": "^2.0.13",
-		"webpack-dev-server": "^3.1.1",
 		"css-loader": "^0.28.11",
-		"style-loader": "^0.20.3"
+		"style-loader": "^0.21.0",
+		"webpack": "^4.6.0",
+		"webpack-cli": "^2.1.2",
+		"webpack-dev-server": "^3.1.3"
 	}
 }

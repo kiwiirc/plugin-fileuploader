@@ -16,7 +16,7 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 			const buffer = kiwi.state.getActiveBuffer()
 			const isValidTarget = buffer && (buffer.isChannel() || buffer.isQuery())
 			if (!isValidTarget) {
-				return Promise.reject('Files can only be shared in channels or queries.')
+				return Promise.reject(new Error('Files can only be shared in channels or queries.'))
 			}
 			return Promise.resolve()
 		},
@@ -29,9 +29,25 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 		.use(Tus, { endpoint: kiwi.state.setting('fileuploader.server') || '/files' })
 		.run()
 
+	const dashboard = uppy.getPlugin('Dashboard')
+
 	// show uppy modal whenever a file is dragged over the page
 	window.addEventListener('dragenter', event => {
-		uppy.getPlugin('Dashboard').openModal()
+		dashboard.openModal()
+	})
+
+	// show uppy modal when files are pasted
+	kiwi.on('buffer.paste', event => {
+		const { files } = event.clipboardData
+
+		// ensure a file has been pasted
+		if (files.length <= 0) {
+			return
+		}
+
+		// pass event to the dashboard for handling
+		dashboard.openModal()
+		dashboard.handlePaste(event)
 	})
 
 	uppy.on('upload-success', (file, resp, uploadURL) => {
@@ -52,7 +68,7 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 		if (result.failed.length === 0) {
 			uppy.reset()
 			// TODO: this would be nicer with a css transition: delay, then fade out
-			uppy.getPlugin('Dashboard').closeModal()
+			dashboard.closeModal()
 		}
 	})
 })
