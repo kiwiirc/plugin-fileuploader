@@ -1,12 +1,14 @@
 package main
 
 import (
-	"log"
 	"os"
 	"time"
 
 	"github.com/caarlos0/env"
 	"github.com/joho/godotenv"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // UploadServerConfig contains settings that control the behavior of the UploadServer
@@ -28,6 +30,9 @@ type UploadServerConfig struct {
 	MaximumUploadSize       int64         `env:"MAXIMUM_UPLOAD_SIZE"       envDefault:"10485760"` // 10 MiB
 	ExpirationAge           time.Duration `env:"EXPIRATION_AGE"            envDefault:"168h"`     // 1 week
 	ExpirationCheckInterval time.Duration `env:"EXPIRATION_CHECK_INTERVAL" envDefault:"5m"`
+
+	// enable debug logging
+	Debug bool `env:"DEBUG" envDefault:"false"`
 }
 
 // LoadFromEnv populates the config from the process environment and .env file
@@ -36,15 +41,21 @@ func (cfg *UploadServerConfig) LoadFromEnv() {
 	err := godotenv.Overload()
 	if err != nil {
 		if _, ok := err.(*os.PathError); ok {
-			log.Println("no .env file loaded")
+			log.Debug().Msg("no .env file loaded")
 		} else {
-			log.Fatalf("%#v", err)
+			log.Fatal().Err(err)
 		}
 	}
 
 	// populate config struct
 	err = env.Parse(cfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err)
+	}
+
+	if cfg.Debug {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
 }

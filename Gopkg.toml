@@ -56,3 +56,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/rubenv/sql-migrate"
+
+[[constraint]]
+  name = "github.com/rs/zerolog"
+  version = "1.6.0"

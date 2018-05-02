@@ -1,9 +1,7 @@
 package shardedfilestore
 
 import (
-	"fmt"
-	"log"
-
+	"github.com/rs/zerolog/log"
 	"github.com/rubenv/sql-migrate"
 )
 
@@ -31,10 +29,10 @@ func (store *ShardedFileStore) initDB() {
 
 	n, err := migrate.Exec(store.Db, store.DbConfig.DriverName, migrations, migrate.Up)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err)
 	}
 
 	if n > 0 {
-		fmt.Printf("Applied %d schema migrations\n", n)
+		log.Info().Int("count", n).Msg("Applied schema migrations")
 	}
 }
