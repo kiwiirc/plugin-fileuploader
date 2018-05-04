@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kiwiirc/plugin-fileuploader/expirer"
+	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 )
 
@@ -39,7 +40,9 @@ func init() {
 
 // Run starts the UploadServer
 func (serv *UploadServer) Run() error {
-	serv.router = gin.Default()
+	serv.router = gin.New()
+	serv.router.Use(logging.GinLogger(), gin.Recovery())
+
 	serv.store = shardedfilestore.New(
 		serv.cfg.StoragePath,
 		serv.cfg.StorageShardLayers,
@@ -49,6 +52,7 @@ func (serv *UploadServer) Run() error {
 			Dsn:        serv.cfg.DBPath,
 		},
 	)
+
 	serv.expirer = expirer.New(
 		serv.store,
 		serv.cfg.ExpirationAge,
