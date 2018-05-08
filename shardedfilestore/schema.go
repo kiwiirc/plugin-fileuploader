@@ -13,7 +13,7 @@ func (store *ShardedFileStore) initDB() {
 			&migrate.Migration{
 				Id: "1",
 				Up: []string{`CREATE TABLE uploads(
-					id TEXT PRIMARY KEY,
+					id VARCHAR(36) PRIMARY KEY,
 					uploader_ip BLOB,
 					sha256sum BLOB,
 					created_at INTEGER(8)
@@ -23,7 +23,7 @@ func (store *ShardedFileStore) initDB() {
 		},
 	}
 
-	n, err := migrate.Exec(store.Db, "sqlite3", migrations, migrate.Up)
+	n, err := migrate.Exec(store.Db, store.DbConfig.DriverName, migrations, migrate.Up)
 	if err != nil {
 		log.Fatal(err)
 	}

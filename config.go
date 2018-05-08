@@ -23,6 +23,7 @@ type UploadServerConfig struct {
 
 	StoragePath             string        `env:"STORAGE_PATH"              envDefault:"./uploads"`
 	StorageShardLayers      int           `env:"STORAGE_SHARD_LAYERS"      envDefault:"6"`
+	DBType                  string        `env:"DATABASE_TYPE"             envDefault:"sqlite3"`
 	DBPath                  string        `env:"DATABASE_PATH"             envDefault:"./uploads.db"`
 	MaximumUploadSize       int64         `env:"MAXIMUM_UPLOAD_SIZE"       envDefault:"10485760"` // 10 MiB
 	ExpirationAge           time.Duration `env:"EXPIRATION_AGE"            envDefault:"168h"`     // 1 week

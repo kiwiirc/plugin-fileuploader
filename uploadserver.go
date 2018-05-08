@@ -43,8 +43,11 @@ func (serv *UploadServer) Run() error {
 	serv.store = shardedfilestore.New(
 		serv.cfg.StoragePath,
 		serv.cfg.StorageShardLayers,
-		serv.cfg.DBPath,
 		serv.cfg.MaximumUploadSize,
+		shardedfilestore.DbConfig{
+			DriverName: serv.cfg.DBType,
+			Dsn:        serv.cfg.DBPath,
+		},
 	)
 	serv.expirer = expirer.New(
 		serv.store,

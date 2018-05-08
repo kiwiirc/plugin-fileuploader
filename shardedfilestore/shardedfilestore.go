@@ -17,7 +17,8 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3" // register SQL driver
+	_ "github.com/go-sql-driver/mysql" // register mysql driver
+	_ "github.com/mattn/go-sqlite3"    // register SQL driver
 	lockfile "gopkg.in/Acconut/lockfile.v1"
 
 	"github.com/tus/tusd"
@@ -27,6 +28,11 @@ import (
 var defaultFilePerm = os.FileMode(0664)
 var defaultDirectoryPerm = os.FileMode(0775)
 
+type DbConfig struct {
+	DriverName string
+	Dsn        string
+}
+
 // ShardedFileStore implements various tusd.DataStore-related interfaces.
 // See the interfaces for more documentation about the different methods.
 type ShardedFileStore struct {
@@ -34,15 +40,25 @@ type ShardedFileStore struct {
 	PrefixShardLayers int    // Number of extra directory layers to prefix file paths with.
 	MaximumSize       int64  // Largest allowed upload size in bytes
 	Db                *sql.DB
+	DbConfig          DbConfig
 }
 
 // New creates a new file based storage backend. The directory specified will
 // be used as the only storage entry. This method does not check
 // whether the path exists, use os.MkdirAll to ensure.
 // In addition, a locking mechanism is provided.
-func New(basePath string, prefixShardLayers int, dbPath string, maximumSize int64) *ShardedFileStore {
-	dsn := fmt.Sprintf("%s?_busy_timeout=5000&cache=shared", dbPath)
-	db, err := sql.Open("sqlite3", dsn)
+func New(basePath string, prefixShardLayers int, maximumSize int64, dbConfig DbConfig) *ShardedFileStore {
+	if !strings.Contains(dbConfig.Dsn, "?") {
+		// Add the default connection options if none are given
+		switch dbConfig.DriverName {
+		case "sqlite3":
+			dbConfig.Dsn += "?_busy_timeout=5000&cache=shared"
+		case "mysql":
+			dbConfig.Dsn += "?parseTime=true"
+		}
+	}
+
+	db, err := sql.Open(dbConfig.DriverName, dbConfig.Dsn)
 	if err != nil {
 		log.Fatalf("Could not open database: %s", err)
 	}
@@ -55,7 +71,7 @@ func New(basePath string, prefixShardLayers int, dbPath string, maximumSize int6
 	// we also don't enable the write-ahead-log because it does not work over a
 	// networked filesystem
 
-	store := &ShardedFileStore{basePath, prefixShardLayers, maximumSize, db}
+	store := &ShardedFileStore{basePath, prefixShardLayers, maximumSize, db, dbConfig}
 	store.initDB()
 	return store
 }
