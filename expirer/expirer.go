@@ -69,7 +69,7 @@ func (expirer *Expirer) gc(t time.Time) {
 }
 
 func (expirer *Expirer) getExpired() (expiredIds []string, err error) {
-	rows, err := expirer.store.Db.Query(`SELECT id FROM uploads WHERE created_at < $1`, time.Now().Add(-expirer.maxAge).Unix())
+	rows, err := expirer.store.Db.Query(`SELECT id FROM uploads WHERE created_at < ?`, time.Now().Add(-expirer.maxAge).Unix())
 	defer rows.Close()
 	if err != nil {
 		return
