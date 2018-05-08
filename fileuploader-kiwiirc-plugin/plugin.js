@@ -10,15 +10,18 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 
 	kiwi.addUi('input', uploadFileButton)
 
+	const uploadTargets = new WeakMap()
+
 	const uppy = Uppy({
 		autoProceed: false,
 		onBeforeFileAdded: (currentFile, files) => {
 			const buffer = kiwi.state.getActiveBuffer()
 			const isValidTarget = buffer && (buffer.isChannel() || buffer.isQuery())
 			if (!isValidTarget) {
-				return Promise.reject('Files can only be shared in channels or queries.')
+				throw new Error('Files can only be shared in channels or queries.')
 			}
-			return Promise.resolve()
+
+			uploadTargets.set(currentFile.data, buffer)
 		},
 		restrictions: {
 			maxFileSize: kiwi.state.setting('fileuploader.maxFileSize') || 10*GB,
@@ -29,9 +32,25 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 		.use(Tus, { endpoint: kiwi.state.setting('fileuploader.server') || '/files' })
 		.run()
 
+	const dashboard = uppy.getPlugin('Dashboard')
+
 	// show uppy modal whenever a file is dragged over the page
 	window.addEventListener('dragenter', event => {
-		uppy.getPlugin('Dashboard').openModal()
+		dashboard.openModal()
+	})
+
+	// show uppy modal when files are pasted
+	kiwi.on('buffer.paste', event => {
+		const { files } = event.clipboardData
+
+		// ensure a file has been pasted
+		if (files.length <= 0) {
+			return
+		}
+
+		// pass event to the dashboard for handling
+		dashboard.openModal()
+		dashboard.handlePaste(event)
 	})
 
 	uppy.on('upload-success', (file, resp, uploadURL) => {
@@ -41,10 +60,11 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 		file = uppy.getFile(file.id)
 
 		// emit a global kiwi event
-		kiwi.emit('fileuploader.uploaded', { url: uploadURL, file: file })
+		kiwi.emit('fileuploader.uploaded', { url: uploadURL, file })
 
 		// send a message with the url of each successful upload
-		kiwi.emit('input.raw', uploadURL)
+		const buffer = uploadTargets.get(file.data)
+		buffer.say(`Uploaded file: ${uploadURL}`)
 	})
 
 	uppy.on('complete', result => {
@@ -52,7 +72,7 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 		if (result.failed.length === 0) {
 			uppy.reset()
 			// TODO: this would be nicer with a css transition: delay, then fade out
-			uppy.getPlugin('Dashboard').closeModal()
+			dashboard.closeModal()
 		}
 	})
 })
