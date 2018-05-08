@@ -107,7 +107,7 @@ func (store *ShardedFileStore) NewUpload(info tusd.FileInfo) (id string, err err
 	}
 
 	// create record in uploads table
-	err = updateRow(store.Db, `INSERT INTO uploads(id, created_at) VALUES ($1, $2)`, id, time.Now().Unix())
+	err = updateRow(store.Db, `INSERT INTO uploads(id, created_at) VALUES (?, ?)`, id, time.Now().Unix())
 	if err != nil {
 		return "", err
 	}
@@ -171,8 +171,8 @@ func (store *ShardedFileStore) getDuplicateCount(id string) (duplicates int, err
 		SELECT count(id)
 		FROM uploads
 		WHERE
-			sha256sum = $1 AND
-			id != $2
+			sha256sum = ? AND
+			id != ?
 	`, hash, id).Scan(&duplicates)
 
 	return
@@ -231,7 +231,7 @@ func (store *ShardedFileStore) Terminate(id string) error {
 	binPath := store.binPath(id)
 
 	// remove upload db record
-	if err := updateRow(store.Db, `DELETE FROM uploads WHERE id = $1`, id); err != nil {
+	if err := updateRow(store.Db, `DELETE FROM uploads WHERE id = ?`, id); err != nil {
 		return err
 	}
 
@@ -320,7 +320,7 @@ func (store *ShardedFileStore) newLock(id string) (lockfile.Lockfile, error) {
 // lookupHash translates a randomly generated upload id into its cryptographic
 // hash by querying the upload database.
 func (store *ShardedFileStore) lookupHash(id string) (hash []byte, isFinal bool, err error) {
-	row := store.Db.QueryRow(`SELECT sha256sum FROM uploads WHERE id = $1`, id)
+	row := store.Db.QueryRow(`SELECT sha256sum FROM uploads WHERE id = ?`, id)
 	err = row.Scan(&hash)
 
 	// no finalized upload exists
@@ -438,8 +438,8 @@ func (store *ShardedFileStore) FinishUpload(id string) error {
 	// update hash in uploads table
 	err = updateRow(store.Db, `
 		UPDATE uploads
-		SET sha256sum = $1
-		WHERE id = $2
+		SET sha256sum = ?
+		WHERE id = ?
 	`, hash, id)
 	if err != nil {
 		return err
