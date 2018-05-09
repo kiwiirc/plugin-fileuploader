@@ -4,6 +4,8 @@ import 'uppy/dist/uppy.min.css'
 const GB = 2**30
 
 kiwi.plugin('fileuploader', function (kiwi, log) {
+	const settings = kiwi.state.setting('fileuploader');
+
 	// add button to input bar
 	const uploadFileButton = document.createElement('i')
 	uploadFileButton.className = 'upload-file-button fa fa-upload'
@@ -24,12 +26,16 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 			uploadTargets.set(currentFile.data, buffer)
 		},
 		restrictions: {
-			maxFileSize: kiwi.state.setting('fileuploader.maxFileSize') || 10*GB,
+			maxFileSize: settings.maxFileSize || 10*GB,
 		},
 	})
-		.use(Dashboard, { trigger: uploadFileButton })
+		.use(Dashboard, {
+			trigger: uploadFileButton,
+			proudlyDisplayPoweredByUppy: false,
+			note: settings.note,
+		})
 		.use(Webcam, { target: Dashboard })
-		.use(Tus, { endpoint: kiwi.state.setting('fileuploader.server') || '/files' })
+		.use(Tus, { endpoint: settings.server || '/files' })
 		.run()
 
 	const dashboard = uppy.getPlugin('Dashboard')
