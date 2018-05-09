@@ -1,11 +1,21 @@
-# Development dependencies
+# File sharing for [Kiwi IRC](https://kiwiirc.com)
 
+* Upload files from you computer / device
+* Take a webcam photo or video
+* Auto delete files after a time period
+
+This plugin includes a file uploading server that will store any user uploaded files on the
+server and then offer them as file downloads with a unique URL. The option to delete files
+after a set time period discourages users from using the server as a permanent file store.
+
+## Development
+
+**Dependencies**
 * yarn
-* [devrun]
-* [dep]
+* devrun (optional, https://github.com/kdar/devrun)
+* dep (optional, https://github.com/golang/dep)
 
-# Instructions
-
+**Running with live-reload of the server and client plugin**
 ```console
 $ dep ensure
 $ devrun watch "go build && ./fileuploader"
@@ -24,10 +34,12 @@ Add the plugin to your kiwiirc `config.json` and configure the settings:
 	],
 	"fileuploader": {
 		"server": "http://localhost:8088/files",
-		"maxFileSize": 10485760
+		"maxFileSize": 10485760,
+		"note": "Add a note to the upload dialog"
 	}
 }
 ```
 
-[devrun]: https://github.com/kdar/devrun
-[dep]: https://github.com/golang/dep
+## License
+
+[ Licensed under the Apache License, Version 2.0](LICENSE).

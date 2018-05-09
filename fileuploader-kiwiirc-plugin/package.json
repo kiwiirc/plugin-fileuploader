@@ -2,7 +2,7 @@
 	"name": "fileuploader-kiwiirc-plugin",
 	"version": "0.1.0",
 	"main": "plugin.js",
-	"license": "UNLICENSED",
+	"license": "Apache-2.0",
 	"private": true,
 	"scripts": {
 		"build": "webpack",
