@@ -1,11 +1,14 @@
 package main
 
 import (
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"path"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 	"github.com/tus/tusd"
 )
@@ -49,9 +52,14 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	store.UseIn(composer)
 
 	config := tusd.Config{
-		BasePath:      serv.cfg.BasePath,
-		StoreComposer: composer,
-		MaxSize:       serv.cfg.MaximumUploadSize,
+		BasePath:                serv.cfg.BasePath,
+		StoreComposer:           composer,
+		MaxSize:                 serv.cfg.MaximumUploadSize,
+		Logger:                  log.New(ioutil.Discard, "", 0),
+		NotifyCompleteUploads:   true,
+		NotifyCreatedUploads:    true,
+		NotifyTerminatedUploads: true,
+		NotifyUploadProgress:    true,
 	}
 
 	routePrefix, err := routePrefixFromBasePath(serv.cfg.BasePath)
@@ -63,6 +71,8 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	if err != nil {
 		return err
 	}
+
+	logging.TusdLogger(handler)
 
 	noopHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
