@@ -20,6 +20,12 @@ func (store *ShardedFileStore) initDB() {
 				);`},
 				Down: []string{"DROP TABLE uploads;"},
 			},
+			&migrate.Migration{
+				Id: "2",
+				Up: []string{`ALTER TABLE uploads
+					ADD deleted INTEGER(1) DEFAULT 0 NOT NULL
+				;`},
+			},
 		},
 	}
 
