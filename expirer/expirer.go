@@ -1,10 +1,11 @@
 package expirer
 
 import (
-	"log"
 	"time"
 
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Expirer struct {
@@ -50,21 +51,27 @@ func (expirer *Expirer) Stop() {
 }
 
 func (expirer *Expirer) gc(t time.Time) {
-	log.Println("Filestore GC tick", t)
+	log.Debug().Msg("Filestore GC tick")
 
 	expiredIds, err := expirer.getExpired()
 	if err != nil {
-		log.Println("Failed to enumerate expired uploads", err)
+		log.Error().
+			Err(err).
+			Msg("Failed to enumerate expired uploads")
 		return
 	}
 
 	for _, id := range expiredIds {
 		err = expirer.store.Terminate(id)
 		if err != nil {
-			log.Println("Failed to terminate expired upload", err)
+			log.Error().
+				Err(err).
+				Msg("Failed to terminate expired upload")
 			continue
 		}
-		log.Println("Terminated upload id", id)
+		log.Info().
+			Str("id", id).
+			Msg("Terminated upload id")
 	}
 }
 

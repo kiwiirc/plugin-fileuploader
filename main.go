@@ -1,23 +1,18 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
-	_ "net/http/pprof"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
-	// pprof
-	/* go func() {
-		pprofAddr := "localhost:6060"
-		log.Println("Starting pprof on", pprofAddr)
-		log.Println(http.ListenAndServe(pprofAddr, nil))
-	}() */
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	var wg sync.WaitGroup
 
@@ -32,7 +27,7 @@ func main() {
 	go runServer(reloadRequested, done, &wg)
 
 	wg.Wait()
-	log.Println("Shutdown complete")
+	log.Info().Msg("Shutdown complete")
 }
 
 func signalHandler(reloadRequested, done chan struct{}) {
@@ -73,7 +68,9 @@ func runServer(reloadRequested, done chan struct{}, wg *sync.WaitGroup) {
 
 		// wait for startup to complete
 		<-serv.GetStartedChan()
-		log.Println("Server listening on", serv.cfg.ListenAddr)
+		log.Info().
+			Str("address", serv.cfg.ListenAddr).
+			Msg("Server listening")
 
 		// wait for error or reload request
 		shouldRestart := func() bool {
@@ -83,7 +80,9 @@ func runServer(reloadRequested, done chan struct{}, wg *sync.WaitGroup) {
 				case err := <-errChan:
 					// quit if unexpected error occurred
 					if err != http.ErrServerClosed {
-						log.Fatalf("Error running upload server: %s", err)
+						log.Fatal().
+							Err(err).
+							Msg("Error running upload server")
 					}
 
 					// server closed by request, exit loop to allow it to restart
@@ -96,12 +95,12 @@ func runServer(reloadRequested, done chan struct{}, wg *sync.WaitGroup) {
 					// server instance while we've already replaced it as the listener
 					// for new connections.
 					go func() {
-						log.Println("Reloading server config")
+						log.Info().Msg("Reloading server config")
 						serv.Shutdown()
 					}()
 
 				case <-done:
-					log.Println("Shutting initiated. Handling existing requests")
+					log.Info().Msg("Shutdown initiated. Handling existing requests")
 					serv.Shutdown()
 					wg.Done()
 					return false

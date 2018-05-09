@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,6 +18,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql" // register mysql driver
 	_ "github.com/mattn/go-sqlite3"    // register SQL driver
+	"github.com/rs/zerolog/log"
 	lockfile "gopkg.in/Acconut/lockfile.v1"
 
 	"github.com/tus/tusd"
@@ -60,7 +60,7 @@ func New(basePath string, prefixShardLayers int, maximumSize int64, dbConfig DbC
 
 	db, err := sql.Open(dbConfig.DriverName, dbConfig.Dsn)
 	if err != nil {
-		log.Fatalf("Could not open database: %s", err)
+		log.Fatal().Err(err).Msg("Could not open database")
 	}
 
 	// note that we don't do db.SetMaxOpenConns(1), as we don't want to limit
@@ -240,7 +240,7 @@ func (store *ShardedFileStore) Terminate(id string) error {
 		if err := RemoveWithDirs(binPath, store.BasePath); err != nil {
 			return err
 		}
-		log.Println("Removed", binPath)
+		log.Info().Str("binPath", binPath).Msg("Removed upload bin")
 	}
 
 	// mark upload db record as deleted
@@ -376,7 +376,7 @@ func (store ShardedFileStore) completeBinPath(hashBytes []byte) string {
 func (store *ShardedFileStore) binPath(id string) string {
 	hashBytes, isFinal, err := store.lookupHash(id)
 	if err != nil {
-		panic(fmt.Sprintf("Could not look up hash: %s", err))
+		log.Fatal().Err(err).Msg("Could not look up hash")
 	}
 
 	if !isFinal {
@@ -433,7 +433,7 @@ func updateRow(db *sql.DB, query string, args ...interface{}) (err error) {
 
 // FinishUpload deduplicates the upload by its cryptographic hash
 func (store *ShardedFileStore) FinishUpload(id string) error {
-	log.Printf("FINISHING UPLOAD %s", id)
+	log.Debug().Str("id", id).Msg("FINISHING UPLOAD")
 	// calculate hash
 	hash, err := store.hashFile(id)
 	if err != nil {
@@ -453,9 +453,14 @@ func (store *ShardedFileStore) FinishUpload(id string) error {
 	// relocate file
 	newPath := store.completeBinPath(hash)
 	os.MkdirAll(filepath.Dir(newPath), defaultDirectoryPerm)
-	err = os.Rename(store.incompleteBinPath(id), newPath)
+	oldPath := store.incompleteBinPath(id)
+	err = os.Rename(oldPath, newPath)
 	if err != nil {
-		log.Printf("Error renaming: %s\n", err.Error())
+		log.Error().
+			Err(err).
+			Str("oldPath", oldPath).
+			Str("newPath", newPath).
+			Msg("Failed to rename")
 	}
 	return err
 }
