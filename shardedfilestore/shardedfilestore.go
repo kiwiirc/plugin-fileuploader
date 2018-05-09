@@ -230,11 +230,6 @@ func (store *ShardedFileStore) Terminate(id string) error {
 
 	binPath := store.binPath(id)
 
-	// remove upload db record
-	if err := updateRow(store.Db, `DELETE FROM uploads WHERE id = ?`, id); err != nil {
-		return err
-	}
-
 	// remove upload .info file
 	if err := RemoveWithDirs(store.infoPath(id), store.BasePath); err != nil {
 		return err
@@ -246,6 +241,16 @@ func (store *ShardedFileStore) Terminate(id string) error {
 			return err
 		}
 		log.Println("Removed", binPath)
+	}
+
+	// mark upload db record as deleted
+	err = updateRow(store.Db, `
+		UPDATE uploads
+		SET deleted = 1
+		WHERE id = ?
+	`, id)
+	if err != nil {
+		return err
 	}
 
 	return nil
