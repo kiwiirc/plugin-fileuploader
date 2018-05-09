@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
 	"os"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env"
@@ -32,7 +35,7 @@ type UploadServerConfig struct {
 	ExpirationCheckInterval time.Duration `env:"EXPIRATION_CHECK_INTERVAL" envDefault:"5m"`
 
 	// enable debug logging
-	Debug bool `env:"DEBUG" envDefault:"false"`
+	LogLevel zerolog.Level `env:"LOG_LEVEL" envDefault:"info"`
 }
 
 // LoadFromEnv populates the config from the process environment and .env file
@@ -48,14 +51,34 @@ func (cfg *UploadServerConfig) LoadFromEnv() {
 	}
 
 	// populate config struct
-	err = env.Parse(cfg)
+	err = env.ParseWithFuncs(cfg, env.CustomParsers{
+		logLevelType: logLevelParser,
+	})
 	if err != nil {
 		log.Fatal().Err(err)
 	}
 
-	if cfg.Debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	} else {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	zerolog.SetGlobalLevel(cfg.LogLevel)
+}
+
+var logLevelType = reflect.TypeOf(zerolog.DebugLevel)
+
+func logLevelParser(v string) (interface{}, error) {
+	level := strings.ToLower(v)
+	switch level {
+	case "debug":
+		return zerolog.DebugLevel, nil
+	case "info":
+		return zerolog.InfoLevel, nil
+	case "warn":
+		return zerolog.WarnLevel, nil
+	case "error":
+		return zerolog.ErrorLevel, nil
+	case "fatal":
+		return zerolog.FatalLevel, nil
+	case "panic":
+		return zerolog.PanicLevel, nil
+	default:
+		return 0, errors.New("Invalid log level")
 	}
 }
