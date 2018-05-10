@@ -1,10 +1,11 @@
-import { Core as Uppy, Dashboard, Webcam, Tus } from 'uppy'
+import { Core as Uppy, Dashboard, Tus, Webcam } from 'uppy'
 import 'uppy/dist/uppy.min.css'
 
-const GB = 2**30
+const KiB = 2 ** 10
+const MiB = 2 ** 20
 
-kiwi.plugin('fileuploader', function (kiwi, log) {
-	const settings = kiwi.state.setting('fileuploader');
+kiwi.plugin('fileuploader', function(kiwi, log) {
+	const settings = kiwi.state.setting('fileuploader')
 
 	// add button to input bar
 	const uploadFileButton = document.createElement('i')
@@ -18,15 +19,18 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 		autoProceed: false,
 		onBeforeFileAdded: (currentFile, files) => {
 			const buffer = kiwi.state.getActiveBuffer()
-			const isValidTarget = buffer && (buffer.isChannel() || buffer.isQuery())
+			const isValidTarget =
+				buffer && (buffer.isChannel() || buffer.isQuery())
 			if (!isValidTarget) {
-				throw new Error('Files can only be shared in channels or queries.')
+				throw new Error(
+					'Files can only be shared in channels or queries.',
+				)
 			}
 
 			uploadTargets.set(currentFile.data, buffer)
 		},
 		restrictions: {
-			maxFileSize: settings.maxFileSize || 10*GB,
+			maxFileSize: settings.maxFileSize || 10 * MiB,
 		},
 	})
 		.use(Dashboard, {
@@ -35,7 +39,10 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 			note: settings.note,
 		})
 		.use(Webcam, { target: Dashboard })
-		.use(Tus, { endpoint: settings.server || '/files' })
+		.use(Tus, {
+			endpoint: settings.server || '/files',
+			chunkSize: 512 * KiB,
+		})
 		.run()
 
 	const dashboard = uppy.getPlugin('Dashboard')
