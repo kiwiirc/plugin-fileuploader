@@ -17,7 +17,8 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql" // register mysql driver
-	_ "github.com/mattn/go-sqlite3"    // register SQL driver
+	"github.com/kiwiirc/plugin-fileuploader/db"
+	_ "github.com/mattn/go-sqlite3" // register SQL driver
 	"github.com/rs/zerolog/log"
 	lockfile "gopkg.in/Acconut/lockfile.v1"
 
@@ -28,57 +29,29 @@ import (
 var defaultFilePerm = os.FileMode(0664)
 var defaultDirectoryPerm = os.FileMode(0775)
 
-type DbConfig struct {
-	DriverName string
-	Dsn        string
-}
-
 // ShardedFileStore implements various tusd.DataStore-related interfaces.
 // See the interfaces for more documentation about the different methods.
 type ShardedFileStore struct {
 	BasePath          string // Relative or absolute path to store files in.
 	PrefixShardLayers int    // Number of extra directory layers to prefix file paths with.
 	MaximumSize       int64  // Largest allowed upload size in bytes
-	Db                *sql.DB
-	DbConfig          DbConfig
+	DBConn            *db.DatabaseConnection
 }
 
 // New creates a new file based storage backend. The directory specified will
 // be used as the only storage entry. This method does not check
 // whether the path exists, use os.MkdirAll to ensure.
 // In addition, a locking mechanism is provided.
-func New(basePath string, prefixShardLayers int, maximumSize int64, dbConfig DbConfig) *ShardedFileStore {
-	if !strings.Contains(dbConfig.Dsn, "?") {
-		// Add the default connection options if none are given
-		switch dbConfig.DriverName {
-		case "sqlite3":
-			dbConfig.Dsn += "?_busy_timeout=5000&cache=shared"
-		case "mysql":
-			dbConfig.Dsn += "?parseTime=true"
-		}
-	}
+func New(basePath string, prefixShardLayers int, maximumSize int64, dbConnection *db.DatabaseConnection) *ShardedFileStore {
 
-	db, err := sql.Open(dbConfig.DriverName, dbConfig.Dsn)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Could not open database")
-	}
-
-	// note that we don't do db.SetMaxOpenConns(1), as we don't want to limit
-	// read concurrency unnecessarily. sqlite will handle write locking on its
-	// own, even across multiple processes accessing the same database file.
-	// https://www.sqlite.org/faq.html#q5
-
-	// we also don't enable the write-ahead-log because it does not work over a
-	// networked filesystem
-
-	store := &ShardedFileStore{basePath, prefixShardLayers, maximumSize, db, dbConfig}
+	store := &ShardedFileStore{basePath, prefixShardLayers, maximumSize, dbConnection}
 	store.initDB()
 	return store
 }
 
 // Close frees the database connection pool held within ShardedFileStore
 func (store *ShardedFileStore) Close() error {
-	return store.Db.Close()
+	return store.DBConn.DB.Close()
 }
 
 // UseIn sets this store as the core data store in the passed composer and adds
@@ -107,7 +80,7 @@ func (store *ShardedFileStore) NewUpload(info tusd.FileInfo) (id string, err err
 	}
 
 	// create record in uploads table
-	err = updateRow(store.Db, `INSERT INTO uploads(id, created_at) VALUES (?, ?)`, id, time.Now().Unix())
+	err = db.UpdateRow(store.DBConn.DB, `INSERT INTO uploads(id, created_at) VALUES (?, ?)`, id, time.Now().Unix())
 	if err != nil {
 		return "", err
 	}
@@ -167,7 +140,7 @@ func (store *ShardedFileStore) getDuplicateCount(id string) (duplicates int, err
 	}
 
 	// check if there are any other uploads pointing to this file
-	err = store.Db.QueryRow(`
+	err = store.DBConn.DB.QueryRow(`
 		SELECT count(id)
 		FROM uploads
 		WHERE
@@ -240,11 +213,13 @@ func (store *ShardedFileStore) Terminate(id string) error {
 		if err := RemoveWithDirs(binPath, store.BasePath); err != nil {
 			return err
 		}
-		log.Info().Str("binPath", binPath).Msg("Removed upload bin")
+		log.Info().
+			Str("binPath", binPath).
+			Msg("Removed upload bin")
 	}
 
 	// mark upload db record as deleted
-	err = updateRow(store.Db, `
+	err = db.UpdateRow(store.DBConn.DB, `
 		UPDATE uploads
 		SET deleted = 1
 		WHERE id = ?
@@ -325,7 +300,7 @@ func (store *ShardedFileStore) newLock(id string) (lockfile.Lockfile, error) {
 // lookupHash translates a randomly generated upload id into its cryptographic
 // hash by querying the upload database.
 func (store *ShardedFileStore) lookupHash(id string) (hash []byte, isFinal bool, err error) {
-	row := store.Db.QueryRow(`SELECT sha256sum FROM uploads WHERE id = ?`, id)
+	row := store.DBConn.DB.QueryRow(`SELECT sha256sum FROM uploads WHERE id = ?`, id)
 	err = row.Scan(&hash)
 
 	// no finalized upload exists
@@ -414,26 +389,10 @@ func (store *ShardedFileStore) writeInfo(id string, info tusd.FileInfo) error {
 	return ioutil.WriteFile(store.infoPath(id), data, defaultFilePerm)
 }
 
-// updateRow wraps db.Exec and ensures that exactly one row was affected
-func updateRow(db *sql.DB, query string, args ...interface{}) (err error) {
-	res, err := db.Exec(query, args...)
-	if err != nil {
-		return
-	}
-
-	count, err := res.RowsAffected()
-	if err != nil {
-		return
-	}
-	if count != 1 {
-		err = fmt.Errorf("Expected 1 affected row, got %d", count)
-	}
-	return
-}
-
 // FinishUpload deduplicates the upload by its cryptographic hash
 func (store *ShardedFileStore) FinishUpload(id string) error {
-	log.Debug().Str("id", id).Msg("FINISHING UPLOAD")
+	log.Debug().Str("id", id).Msg("Finishing upload")
+
 	// calculate hash
 	hash, err := store.hashFile(id)
 	if err != nil {
@@ -441,7 +400,7 @@ func (store *ShardedFileStore) FinishUpload(id string) error {
 	}
 
 	// update hash in uploads table
-	err = updateRow(store.Db, `
+	err = db.UpdateRow(store.DBConn.DB, `
 		UPDATE uploads
 		SET sha256sum = ?
 		WHERE id = ?

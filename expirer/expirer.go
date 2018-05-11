@@ -20,7 +20,7 @@ func New(store *shardedfilestore.ShardedFileStore, maxAge, checkInterval time.Du
 		time.NewTicker(checkInterval),
 		store,
 		maxAge,
-		make(chan struct{}, 1),
+		make(chan struct{}),
 	}
 
 	go func() {
@@ -76,17 +76,17 @@ func (expirer *Expirer) gc(t time.Time) {
 }
 
 func (expirer *Expirer) getExpired() (expiredIds []string, err error) {
-	rows, err := expirer.store.Db.Query(`
+	rows, err := expirer.store.DBConn.DB.Query(`
 		SELECT id FROM uploads
 		WHERE created_at < ?
 		AND deleted != 1
 	`, time.Now().Add(-expirer.maxAge).Unix())
-	if rows != nil {
-		defer rows.Close()
-	}
-	if err != nil {
+
+	if rows == nil || err != nil {
 		return
 	}
+
+	defer rows.Close()
 
 	var id string
 

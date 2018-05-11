@@ -4,6 +4,10 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/kiwiirc/plugin-fileuploader/db"
+
+	"github.com/kiwiirc/plugin-fileuploader/events"
+
 	"github.com/gin-gonic/gin"
 	"github.com/kiwiirc/plugin-fileuploader/expirer"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
@@ -13,13 +17,15 @@ import (
 // UploadServer is a simple configurable service for file sharing.
 // Compatible with TUS upload clients.
 type UploadServer struct {
-	cfg        UploadServerConfig
-	store      *shardedfilestore.ShardedFileStore
-	router     *gin.Engine
-	expirer    *expirer.Expirer
-	httpServer *http.Server
-	startedMu  sync.Mutex
-	started    chan struct{}
+	cfg                 UploadServerConfig
+	DBConn              *db.DatabaseConnection
+	store               *shardedfilestore.ShardedFileStore
+	router              *gin.Engine
+	expirer             *expirer.Expirer
+	httpServer          *http.Server
+	startedMu           sync.Mutex
+	started             chan struct{}
+	tusEventBroadcaster *events.TusEventBroadcaster
 }
 
 // GetStartedChan returns a channel that will close when the server startup is complete
@@ -43,14 +49,16 @@ func (serv *UploadServer) Run() error {
 	serv.router = gin.New()
 	serv.router.Use(logging.GinLogger(), gin.Recovery())
 
+	serv.DBConn = db.ConnectToDB(db.DBConfig{
+		DriverName: serv.cfg.DBType,
+		DSN:        serv.cfg.DBPath,
+	})
+
 	serv.store = shardedfilestore.New(
 		serv.cfg.StoragePath,
 		serv.cfg.StorageShardLayers,
 		serv.cfg.MaximumUploadSize,
-		shardedfilestore.DbConfig{
-			DriverName: serv.cfg.DBType,
-			Dsn:        serv.cfg.DBPath,
-		},
+		serv.DBConn,
 	)
 
 	serv.expirer = expirer.New(
@@ -90,5 +98,8 @@ func (serv *UploadServer) Shutdown() {
 	serv.expirer.Stop()
 
 	// close db connections
-	serv.store.Close()
+	serv.DBConn.DB.Close()
+
+	// close event broadcaster
+	serv.tusEventBroadcaster.Close()
 }
