@@ -36,7 +36,7 @@ Add the plugin to your kiwiirc `config.json` and configure the settings:
 	"fileuploader": {
 		"server": "http://localhost:8088/files",
 		"maxFileSize": 10485760,
-		"note": "Add am optional note to the upload dialog"
+		"note": "Add an optional note to the upload dialog"
 	}
 }
 ```
