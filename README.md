@@ -41,6 +41,12 @@ Add the plugin to your kiwiirc `config.json` and configure the settings:
 }
 ```
 
+## Database configuration
+File uploads are logged into a database. Currently the supported databases are sqlite and mysql.
+
+* `DATABASE_TYPE` can either by `sqlite` or `mysql`. The default is `sqlite`.
+* `DATABASE_PATH` is the path to your database file for sqlite. For mysql it is a DSN in the format `user:password@tcp(127.0.0.1:3306)/database`.
+
 ## License
 
 [ Licensed under the Apache License, Version 2.0](LICENSE).
