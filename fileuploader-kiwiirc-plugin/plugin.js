@@ -4,6 +4,15 @@ import 'uppy/dist/uppy.min.css'
 const KiB = 2 ** 10
 const MiB = 2 ** 20
 
+function getValidUploadTarget() {
+	const buffer = kiwi.state.getActiveBuffer()
+	const isValidTarget = buffer && (buffer.isChannel() || buffer.isQuery())
+	if (!isValidTarget) {
+		throw new Error('Files can only be shared in channels or queries.')
+	}
+	return buffer
+}
+
 kiwi.plugin('fileuploader', function(kiwi, log) {
 	const settings = kiwi.state.setting('fileuploader')
 
@@ -13,21 +22,11 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 
 	kiwi.addUi('input', uploadFileButton)
 
-	const uploadTargets = new WeakMap()
-
 	const uppy = Uppy({
 		autoProceed: false,
 		onBeforeFileAdded: (currentFile, files) => {
-			const buffer = kiwi.state.getActiveBuffer()
-			const isValidTarget =
-				buffer && (buffer.isChannel() || buffer.isQuery())
-			if (!isValidTarget) {
-				throw new Error(
-					'Files can only be shared in channels or queries.',
-				)
-			}
-
-			uploadTargets.set(currentFile.data, buffer)
+			// throws if invalid, canceling the file add
+			getValidUploadTarget()
 		},
 		restrictions: {
 			maxFileSize: settings.maxFileSize || 10 * MiB,
@@ -66,6 +65,10 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 		dashboard.handlePaste(event)
 	})
 
+	uppy.on('file-added', file => {
+		file.kiwiFileUploaderTargetBuffer = getValidUploadTarget()
+	})
+
 	uppy.on('upload-success', (file, resp, uploadURL) => {
 		// append filename to uploadURL
 		uploadURL = `${uploadURL}/${encodeURIComponent(file.meta.name)}`
@@ -76,7 +79,7 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 		kiwi.emit('fileuploader.uploaded', { url: uploadURL, file })
 
 		// send a message with the url of each successful upload
-		const buffer = uploadTargets.get(file.data)
+		const buffer = file.kiwiFileUploaderTargetBuffer
 		buffer.say(`Uploaded file: ${uploadURL}`)
 	})
 
