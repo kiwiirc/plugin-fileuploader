@@ -1,13 +1,20 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
-	"log"
+	goLog "log"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
 
+	"github.com/rs/zerolog/log"
+	"github.com/tus/tusd/cmd/tusd/cli"
+
 	"github.com/gin-gonic/gin"
+	"github.com/kiwiirc/plugin-fileuploader/db"
+	"github.com/kiwiirc/plugin-fileuploader/events"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 	"github.com/tus/tusd"
@@ -55,7 +62,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 		BasePath:                serv.cfg.BasePath,
 		StoreComposer:           composer,
 		MaxSize:                 serv.cfg.MaximumUploadSize,
-		Logger:                  log.New(ioutil.Discard, "", 0),
+		Logger:                  goLog.New(ioutil.Discard, "", 0),
 		NotifyCompleteUploads:   true,
 		NotifyCreatedUploads:    true,
 		NotifyTerminatedUploads: true,
@@ -72,7 +79,14 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 		return err
 	}
 
-	logging.TusdLogger(handler)
+	// create event broadcaster
+	serv.tusEventBroadcaster = events.NewTusEventBroadcaster(handler)
+
+	// attach logger
+	go logging.TusdLogger(serv.tusEventBroadcaster)
+
+	// attach uploader IP recorder
+	go serv.ipRecorder(serv.tusEventBroadcaster)
 
 	noopHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
@@ -83,7 +97,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	r.Use(customizedCors(serv.cfg.CorsOrigins))
 
 	rg := r.Group(routePrefix)
-	rg.POST("", gin.WrapF(handler.PostFile))
+	rg.POST("", serv.postFile(handler))
 	rg.HEAD(":id", gin.WrapF(handler.HeadFile))
 	rg.PATCH(":id", gin.WrapF(handler.PatchFile))
 
@@ -106,4 +120,92 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	}
 
 	return nil
+}
+
+func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		err := addRemoteIPToMetadata(c.Request)
+		if err != nil {
+			if addrErr, ok := err.(*net.AddrError); ok {
+				c.AbortWithError(http.StatusInternalServerError, addrErr).SetType(gin.ErrorTypePrivate)
+			} else {
+				c.AbortWithError(http.StatusNotAcceptable, err)
+			}
+			return
+		}
+
+		handler.PostFile(c.Writer, c.Request)
+	}
+}
+
+func addRemoteIPToMetadata(req *http.Request) (err error) {
+	const uploadMetadataHeader = "Upload-Metadata"
+	const remoteIPKey = "RemoteIP"
+
+	metadata := parseMeta(req.Header.Get(uploadMetadataHeader))
+
+	// ensure the client doesn't attempt to specify their own RemoteIP
+	for k := range metadata {
+		if k == remoteIPKey {
+			return fmt.Errorf("Metadata field " + remoteIPKey + " cannot be set by client")
+		}
+	}
+
+	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
+
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Could not split address into host and port")
+		return
+	}
+
+	// add RemoteIP to metadata
+	metadata[remoteIPKey] = remoteIP
+
+	// override original header
+	req.Header.Set(uploadMetadataHeader, serializeMeta(metadata))
+
+	return
+}
+
+func (serv *UploadServer) ipRecorder(broadcaster *events.TusEventBroadcaster) {
+	channel := broadcaster.Listen()
+	for {
+		event, ok := <-channel
+		if !ok {
+			return // channel closed
+		}
+		if event.Type == cli.HookPostCreate {
+			go func() {
+				remoteIPStr := event.Info.MetaData["RemoteIP"]
+
+				ip := net.ParseIP(remoteIPStr)
+
+				if ip == nil {
+					log.Error().
+						Str("ip", remoteIPStr).
+						Msg("Failed to parse IP address")
+					return
+				}
+
+				log.Debug().
+					Str("id", event.Info.ID).
+					Str("ip", ip.String()).
+					Msg("Recording uploader IP")
+
+				err := db.UpdateRow(serv.DBConn.DB, `
+					UPDATE uploads
+					SET uploader_ip = ?
+					WHERE id = ?
+				`, ip, event.Info.ID)
+
+				if err != nil {
+					log.Error().
+						Err(err).
+						Msg("Failed to record uploader IP")
+				}
+			}()
+		}
+	}
 }

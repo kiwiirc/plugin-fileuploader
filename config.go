@@ -44,7 +44,7 @@ func (cfg *UploadServerConfig) LoadFromEnv() {
 	err := godotenv.Overload()
 	if err != nil {
 		if _, ok := err.(*os.PathError); ok {
-			log.Debug().Msg("no .env file loaded")
+			log.Debug().Msg("No .env file loaded")
 		} else {
 			log.Fatal().Err(err)
 		}

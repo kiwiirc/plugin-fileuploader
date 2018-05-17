@@ -56,6 +56,6 @@ func GinLogger() gin.HandlerFunc {
 			logEvent.Errs("publicErrors", publicErrors)
 		}
 
-		logEvent.Msg("handled request")
+		logEvent.Msg("Handled request")
 	}
 }

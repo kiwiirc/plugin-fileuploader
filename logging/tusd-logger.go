@@ -3,43 +3,38 @@
 package logging
 
 import (
+	"encoding/json"
+
+	"github.com/kiwiirc/plugin-fileuploader/events"
 	"github.com/rs/zerolog/log"
-	"github.com/tus/tusd"
-	"github.com/tus/tusd/cmd/tusd/cli"
 )
 
-func TusdLogger(handler *tusd.UnroutedHandler) {
-	go func() {
-		for {
-			select {
-			case info := <-handler.CompleteUploads:
-				logHook(cli.HookPostFinish, info)
-			case info := <-handler.TerminatedUploads:
-				logHook(cli.HookPostTerminate, info)
-			case info := <-handler.UploadProgress:
-				logHook(cli.HookPostReceive, info)
-			case info := <-handler.CreatedUploads:
-				logHook(cli.HookPostCreate, info)
-			}
+func TusdLogger(broadcaster *events.TusEventBroadcaster) {
+	channel := broadcaster.Listen()
+	for {
+		event, ok := <-channel
+		if !ok {
+			return // channel closed
 		}
-	}()
+		go handleTusEvent(event)
+	}
 }
 
-func logHook(typ cli.HookType, info tusd.FileInfo) {
-	go func() {
-		logEvent := log.Info().
-			Str("id", info.ID).
-			Int64("size", info.Size).
-			Int64("offset", info.Offset)
+func handleTusEvent(event *events.TusEvent) {
+	logEvent := log.Info().
+		Str("id", event.Info.ID).
+		Int64("size", event.Info.Size).
+		Int64("offset", event.Info.Offset)
 
-		for k, v := range info.MetaData {
-			logEvent.Str(k, v)
-		}
+	metadataJSON, err := json.Marshal(event.Info.MetaData)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to serialize metadata")
+	}
+	logEvent.RawJSON("metadata", metadataJSON)
 
-		logEvent.
-			Bool("isPartial", info.IsPartial).
-			Strs("partialUploads", info.PartialUploads)
+	logEvent.
+		Bool("isPartial", event.Info.IsPartial).
+		Strs("partialUploads", event.Info.PartialUploads)
 
-		logEvent.Msg(string(typ))
-	}()
+	logEvent.Msg("Tusd " + string(event.Type))
 }

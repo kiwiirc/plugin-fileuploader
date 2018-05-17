@@ -6,6 +6,7 @@
 # build artifacts
 /debug
 /plugin-fileuploader
+/fileuploader-backend
 
 # editor cruft
 /.vscode/

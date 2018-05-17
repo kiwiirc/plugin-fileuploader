@@ -27,7 +27,7 @@ func (store *ShardedFileStore) initDB() {
 		},
 	}
 
-	n, err := migrate.Exec(store.Db, store.DbConfig.DriverName, migrations, migrate.Up)
+	n, err := migrate.Exec(store.DBConn.DB, store.DBConn.DriverName, migrations, migrate.Up)
 	if err != nil {
 		log.Fatal().Err(err)
 	}
