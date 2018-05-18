@@ -58,10 +58,13 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
 
+	maximumUploadSize := serv.cfg.MaximumUploadSize
+	log.Debug().Str("size", maximumUploadSize.String()).Msg("Using upload limit")
+
 	config := tusd.Config{
 		BasePath:                serv.cfg.BasePath,
 		StoreComposer:           composer,
-		MaxSize:                 serv.cfg.MaximumUploadSize,
+		MaxSize:                 int64(maximumUploadSize.Bytes()),
 		Logger:                  goLog.New(ioutil.Discard, "", 0),
 		NotifyCompleteUploads:   true,
 		NotifyCreatedUploads:    true,

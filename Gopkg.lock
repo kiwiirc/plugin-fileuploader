@@ -12,8 +12,8 @@
     "internal/version",
     "storage"
   ]
-  revision = "29f476ffa9c4cd4fd14336b6043090ac1ad76733"
-  version = "v0.21.0"
+  revision = "0fd7230b2a7505833d5f69b75cbd6c9582401479"
+  version = "v0.23.0"
 
 [[projects]]
   name = "github.com/aws/aws-sdk-go"
@@ -46,8 +46,8 @@
     "service/s3",
     "service/sts"
   ]
-  revision = "31bd69f7db00cbf3d85d129e16d42304cb6e455f"
-  version = "v1.13.44"
+  revision = "5f796043d63bfddca929cfbcffce01e5a894aad5"
+  version = "v1.13.52"
 
 [[projects]]
   branch = "master"
@@ -62,10 +62,17 @@
   revision = "6226ea591a40176dd3ff9cd8eff81ed6ca721a00"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/c2h5oh/datasize"
+  packages = ["."]
+  revision = "4eba002a5eaea69cf8d235a388fc6b65ae68d2dd"
+
+[[projects]]
+  branch = "fix-uint64-alias-custom-parser"
   name = "github.com/caarlos0/env"
   packages = ["."]
-  revision = "1cddc31c48c56ecd700d873edb9fd5b6f5df922a"
-  version = "v3.3.0"
+  revision = "61c4a202391f6bffb7fc8c179b5c59279cc57a0f"
+  source = "github.com/vith/env"
 
 [[projects]]
   branch = "master"
@@ -93,7 +100,7 @@
   name = "github.com/go-sql-driver/mysql"
   packages = ["."]
   revision = "a0583e0143b1624142adab07e0e97fe106d99561"
-  version = "v1.3"
+  version = "v1.3.0"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -163,7 +170,7 @@
     "internal/bitbucket.org/ww/goautoneg",
     "model"
   ]
-  revision = "d811d2e9bf898806ecfb6ef6296774b13ffc314c"
+  revision = "7600349dcfe1abd18d72d3a1770870d9800a7801"
 
 [[projects]]
   branch = "master"
@@ -184,8 +191,8 @@
     "internal/json",
     "log"
   ]
-  revision = "05eafee0eb17d0150591a8f30f0fa592cc9b7471"
-  version = "v1.6.0"
+  revision = "fb469685aa8f19d742eff3f56a0bd51a23265829"
+  version = "v1.7.0"
 
 [[projects]]
   branch = "master"
@@ -197,10 +204,10 @@
   revision = "081fe17d19ff4e2dd9f5a0c1158e6bcf74da6906"
 
 [[projects]]
-  branch = "master"
   name = "github.com/sethgrid/pester"
   packages = ["."]
   revision = "03e26c9abbbf5accb8349790bf9f41bde09d72c3"
+  version = "1.0.0"
 
 [[projects]]
   name = "github.com/tus/tusd"
@@ -262,7 +269,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "f73e4c9ed3b7ebdd5f699a16a880c2b1994e50dd"
+  revision = "57065200b4b034a1c8ad54ff77069408c2218ae6"
 
 [[projects]]
   branch = "master"
@@ -274,13 +281,13 @@
     "jws",
     "jwt"
   ]
-  revision = "cdc340f7c179dbbfa4afd43b7614e8fcadde4269"
+  revision = "a582fe72a3544273cdcc8891c874262a415fb136"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "7db1c3b1a98089d0071c84f646ff5c96aad43682"
+  revision = "7c87d13f8e835d2fb3a70a2912c811ed0c1d241b"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -317,7 +324,7 @@
     "storage/v1",
     "transport/http"
   ]
-  revision = "4bd7f4beb291148443ed4553071c4e0697ff4afb"
+  revision = "4f7dd2b006a4ffd9fd683c1c734d2fe91ca0ea1c"
 
 [[projects]]
   name = "google.golang.org/appengine"
@@ -345,7 +352,7 @@
     "googleapis/rpc/code",
     "googleapis/rpc/status"
   ]
-  revision = "86e600f69ee4704c6efbf6a2a40a5c10700e76c2"
+  revision = "11a468237815f3a3ddf9f7c6e8b6b3b382a24d15"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -405,6 +412,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f547e42d1f0fc6c79bdbcf1b7bda81dbdd59adbcacbc3a0ac282f94d22e6ab12"
+  inputs-digest = "b1bcc1ca2378c79810525ca92b96ff6ec23daf61987b3b072d731d100e0a1ef5"
   solver-name = "gps-cdcl"
   solver-version = 1

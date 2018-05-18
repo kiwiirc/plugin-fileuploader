@@ -34,7 +34,6 @@ var defaultDirectoryPerm = os.FileMode(0775)
 type ShardedFileStore struct {
 	BasePath          string // Relative or absolute path to store files in.
 	PrefixShardLayers int    // Number of extra directory layers to prefix file paths with.
-	MaximumSize       int64  // Largest allowed upload size in bytes
 	DBConn            *db.DatabaseConnection
 }
 
@@ -42,9 +41,9 @@ type ShardedFileStore struct {
 // be used as the only storage entry. This method does not check
 // whether the path exists, use os.MkdirAll to ensure.
 // In addition, a locking mechanism is provided.
-func New(basePath string, prefixShardLayers int, maximumSize int64, dbConnection *db.DatabaseConnection) *ShardedFileStore {
+func New(basePath string, prefixShardLayers int, dbConnection *db.DatabaseConnection) *ShardedFileStore {
 
-	store := &ShardedFileStore{basePath, prefixShardLayers, maximumSize, dbConnection}
+	store := &ShardedFileStore{basePath, prefixShardLayers, dbConnection}
 	store.initDB()
 	return store
 }
