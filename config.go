@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/c2h5oh/datasize"
 	"github.com/caarlos0/env"
 	"github.com/joho/godotenv"
 
@@ -26,15 +27,15 @@ type UploadServerConfig struct {
 	// comma separated list of CORS Origins to allow
 	CorsOrigins []string `env:"CORS_ORIGINS" envSeparator:","`
 
-	StoragePath             string        `env:"STORAGE_PATH"              envDefault:"./uploads"`
-	StorageShardLayers      int           `env:"STORAGE_SHARD_LAYERS"      envDefault:"6"`
-	DBType                  string        `env:"DATABASE_TYPE"             envDefault:"sqlite3"`
-	DBPath                  string        `env:"DATABASE_PATH"             envDefault:"./uploads.db"`
-	MaximumUploadSize       int64         `env:"MAXIMUM_UPLOAD_SIZE"       envDefault:"10485760"` // 10 MiB
-	ExpirationAge           time.Duration `env:"EXPIRATION_AGE"            envDefault:"168h"`     // 1 week
-	ExpirationCheckInterval time.Duration `env:"EXPIRATION_CHECK_INTERVAL" envDefault:"5m"`
+	StoragePath             string            `env:"STORAGE_PATH"              envDefault:"./uploads"`
+	StorageShardLayers      int               `env:"STORAGE_SHARD_LAYERS"      envDefault:"6"`
+	DBType                  string            `env:"DATABASE_TYPE"             envDefault:"sqlite3"`
+	DBPath                  string            `env:"DATABASE_PATH"             envDefault:"./uploads.db"`
+	MaximumUploadSize       datasize.ByteSize `env:"MAXIMUM_UPLOAD_SIZE"       envDefault:"10 MB"`
+	ExpirationAge           time.Duration     `env:"EXPIRATION_AGE"            envDefault:"168h"` // 1 week
+	ExpirationCheckInterval time.Duration     `env:"EXPIRATION_CHECK_INTERVAL" envDefault:"5m"`
 
-	// enable debug logging
+	// set global loglevel
 	LogLevel zerolog.Level `env:"LOG_LEVEL" envDefault:"info"`
 }
 
@@ -46,22 +47,21 @@ func (cfg *UploadServerConfig) LoadFromEnv() {
 		if _, ok := err.(*os.PathError); ok {
 			log.Debug().Msg("No .env file loaded")
 		} else {
-			log.Fatal().Err(err)
+			log.Fatal().Err(err).Msg("failed to load .env")
 		}
 	}
 
 	// populate config struct
 	err = env.ParseWithFuncs(cfg, env.CustomParsers{
-		logLevelType: logLevelParser,
+		reflect.TypeOf(zerolog.DebugLevel): logLevelParser,
+		reflect.TypeOf(datasize.B):         byteSizeParser,
 	})
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("failed to parse config")
 	}
 
 	zerolog.SetGlobalLevel(cfg.LogLevel)
 }
-
-var logLevelType = reflect.TypeOf(zerolog.DebugLevel)
 
 func logLevelParser(v string) (interface{}, error) {
 	level := strings.ToLower(v)
@@ -81,4 +81,14 @@ func logLevelParser(v string) (interface{}, error) {
 	default:
 		return 0, errors.New("Invalid log level")
 	}
+}
+
+func byteSizeParser(v string) (interface{}, error) {
+	var bytes datasize.ByteSize
+	err := bytes.UnmarshalText([]byte(v))
+	if err != nil {
+		log.Error().Err(err).Str("stringValue", v).Msg("failed to parse byteSize")
+		return nil, err
+	}
+	return bytes, nil
 }

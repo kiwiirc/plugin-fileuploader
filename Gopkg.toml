@@ -39,8 +39,8 @@
 
 [[constraint]]
   name = "github.com/caarlos0/env"
-  version = "3.2.0"
-
+  branch = "fix-uint64-alias-custom-parser"
+  source = "github.com/vith/env"
 [[constraint]]
   name = "github.com/joho/godotenv"
   version = "1.2.0"
@@ -60,3 +60,7 @@
 [[constraint]]
   name = "github.com/rs/zerolog"
   version = "1.6.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/c2h5oh/datasize"
