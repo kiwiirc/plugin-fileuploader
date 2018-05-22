@@ -5775,9 +5775,9 @@ upath@^1.0.0:
   version "1.0.5"
   resolved "https://registry.yarnpkg.com/upath/-/upath-1.0.5.tgz#02cab9ecebe95bbec6d5fc2566325725ab6d1a73"
 
-uppy@^0.24.2:
-  version "0.24.2"
-  resolved "https://registry.yarnpkg.com/uppy/-/uppy-0.24.2.tgz#d6bccea093ee079a8873478b744d99265117dda5"
+"uppy@https://github.com/vith/uppy/releases/download/tus-metadata/uppy-0.24.4.tgz":
+  version "0.24.4"
+  resolved "https://github.com/vith/uppy/releases/download/tus-metadata/uppy-0.24.4.tgz#514178ba4bb5821cc1a554dd3bdf0a5983ed794d"
   dependencies:
     classnames "^2.2.5"
     cuid "^2.0.2"

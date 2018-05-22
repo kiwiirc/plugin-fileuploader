@@ -10,7 +10,7 @@
 		"start": "webpack-dev-server"
 	},
 	"dependencies": {
-		"uppy": "^0.24.2"
+		"uppy": "https://github.com/vith/uppy/releases/download/tus-metadata/uppy-0.24.4.tgz"
 	},
 	"devDependencies": {
 		"css-loader": "^0.28.11",
