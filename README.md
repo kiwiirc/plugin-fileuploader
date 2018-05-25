@@ -9,7 +9,7 @@ This plugin includes a file uploading server that will store any user uploaded f
 server and then offer them as file downloads with a unique URL. The option to delete files
 after a set time period discourages users from using the server as a permanent file store.
 
-#### Dependencies**
+#### Dependencies
 * yarn
 * dep (optional, https://github.com/golang/dep)
 
