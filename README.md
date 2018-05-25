@@ -13,17 +13,31 @@ after a set time period discourages users from using the server as a permanent f
 
 **Dependencies**
 * yarn
-* devrun (optional, https://github.com/kdar/devrun)
 * dep (optional, https://github.com/golang/dep)
 
-**Running with live-reload of the server and client plugin**
+**Running the upload server**
+The upload web server stores the files on the server and serves them to kiwi users.
 ```console
 $ dep ensure
-$ devrun watch "go build && ./fileuploader"
-$ cd fileuploader-kiwiirc-plugin && yarn serve
+$ go run *.go"
 ```
 
-Add the plugin to your kiwiirc `config.json` and configure the settings:
+To build the server for production:
+```console
+$ go build *.go
+```
+
+**Building the Kiwi IRC plugin**
+The kiwi plugin is the javascript file that you link to in your kiwiirc configuration. It is the front end that provides the upload UI.
+
+`yarn start` will start a webpack development server that hot-reloads the plugin as you develop it.
+`yarn build` will build the final plugin.js that you can use in production.
+
+```console
+$ cd fileuploader-kiwiirc-plugin && yarn start
+```
+
+Add the plugin javascript file to your kiwiirc `config.json` and configure the settings:
 
 ```json
 {
