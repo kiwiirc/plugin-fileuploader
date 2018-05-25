@@ -9,13 +9,12 @@ This plugin includes a file uploading server that will store any user uploaded f
 server and then offer them as file downloads with a unique URL. The option to delete files
 after a set time period discourages users from using the server as a permanent file store.
 
-## Development
-
-**Dependencies**
+#### Dependencies**
 * yarn
 * dep (optional, https://github.com/golang/dep)
 
-**Running the upload server**
+#### Running the upload server
+
 The upload web server stores the files on the server and serves them to kiwi users.
 ```console
 $ dep ensure
@@ -27,7 +26,8 @@ To build the server for production:
 $ go build *.go
 ```
 
-**Building the Kiwi IRC plugin**
+#### Building the Kiwi IRC plugin
+
 The kiwi plugin is the javascript file that you link to in your kiwiirc configuration. It is the front end that provides the upload UI.
 
 `yarn start` will start a webpack development server that hot-reloads the plugin as you develop it.
