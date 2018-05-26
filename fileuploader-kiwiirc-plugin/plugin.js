@@ -53,16 +53,17 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 
 	// show uppy modal when files are pasted
 	kiwi.on('buffer.paste', event => {
-		const { files } = event.clipboardData
+		// IE 11 puts the clipboardData on the window
+		const cbData = event.clipboardData || window.clipboardData;
 
 		// ensure a file has been pasted
-		if (files.length <= 0) {
+		if (cbData && cbData.files.length <= 0) {
 			return
 		}
 
 		// pass event to the dashboard for handling
-		dashboard.openModal()
 		dashboard.handlePaste(event)
+		dashboard.openModal()
 	})
 
 	uppy.on('file-added', file => {
