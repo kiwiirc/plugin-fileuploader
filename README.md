@@ -10,33 +10,30 @@ server and then offer them as file downloads with a unique URL. The option to de
 after a set time period discourages users from using the server as a permanent file store.
 
 #### Dependencies
-* yarn
-* dep (optional, https://github.com/golang/dep)
+* yarn (https://yarnpkg.com/ - for the kiwiirc plugin UI)
+* dep (https://github.com/golang/dep - for the server)
 
-#### Running the upload server
+#### Running the file upload server
 
-The upload web server stores the files on the server and serves them to kiwi users.
+The file upload web server stores the files on the server and serves them to kiwi users.
 ```console
 $ dep ensure
-$ go run *.go"
+$ go run *.go
 ```
 
 To build the server for production:
 ```console
-$ go build *.go
+$ go build -o fileuploader *.go
 ```
 
 #### Building the Kiwi IRC plugin
 
 The kiwi plugin is the javascript file that you link to in your kiwiirc configuration. It is the front end that provides the upload UI.
 
-`yarn start` will start a webpack development server that hot-reloads the plugin as you develop it.
-`yarn build` will build the final plugin.js that you can use in production.
+* `$ yarn start` will start a webpack development server that hot-reloads the plugin as you develop it. Use the URL `http://localhost:9000/main.js` as the plugin URL in your kiwiirc configuration.
+* `$ yarn build` will build the final plugin that you can use in production. It will be built into dist/main.js.
 
-```console
-$ cd fileuploader-kiwiirc-plugin && yarn start
-```
-
+##### Loading the plugin into kiwiirc
 Add the plugin javascript file to your kiwiirc `config.json` and configure the settings:
 
 ```json
