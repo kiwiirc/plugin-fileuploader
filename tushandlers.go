@@ -127,7 +127,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 
 func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		err := addRemoteIPToMetadata(c.Request)
+		err := serv.addRemoteIPToMetadata(c.Request)
 		if err != nil {
 			if addrErr, ok := err.(*net.AddrError); ok {
 				c.AbortWithError(http.StatusInternalServerError, addrErr).SetType(gin.ErrorTypePrivate)
@@ -141,7 +141,7 @@ func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFun
 	}
 }
 
-func addRemoteIPToMetadata(req *http.Request) (err error) {
+func (serv *UploadServer) addRemoteIPToMetadata(req *http.Request) (err error) {
 	const uploadMetadataHeader = "Upload-Metadata"
 	const remoteIPKey = "RemoteIP"
 
@@ -154,13 +154,10 @@ func addRemoteIPToMetadata(req *http.Request) (err error) {
 		}
 	}
 
-	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
-
+	// determine the originating IP
+	remoteIP, err := serv.getDirectOrForwardedRemoteIP(req)
 	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Could not split address into host and port")
-		return
+		return err
 	}
 
 	// add RemoteIP to metadata
@@ -170,6 +167,41 @@ func addRemoteIPToMetadata(req *http.Request) (err error) {
 	req.Header.Set(uploadMetadataHeader, serializeMeta(metadata))
 
 	return
+}
+
+func (serv *UploadServer) getDirectOrForwardedRemoteIP(req *http.Request) (string, error) {
+	// extract direct IP
+	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Could not split address into host and port")
+		return "", err
+	}
+
+	// use X-Forwarded-For header if direct IP is a trusted reverse proxy
+	if forwardedFor := req.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+		if serv.remoteIPisTrusted(net.ParseIP(remoteIP)) {
+			return forwardedFor, nil
+		}
+		log.Warn().
+			Str("X-Forwarded-For", forwardedFor).
+			Str("remoteIP", remoteIP).
+			Msg("Untrusted remote attempted to override stored IP")
+	}
+
+	// otherwise use direct IP
+	return remoteIP, nil
+}
+
+func (serv *UploadServer) remoteIPisTrusted(remoteIP net.IP) bool {
+	// check if remote IP is a trusted reverse proxy
+	for _, trustedNet := range serv.cfg.TrustedReverseProxyRanges {
+		if trustedNet.Contains(remoteIP) {
+			return true
+		}
+	}
+	return false
 }
 
 func (serv *UploadServer) ipRecorder(broadcaster *events.TusEventBroadcaster) {

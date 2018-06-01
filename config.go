@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"net"
 	"os"
 	"reflect"
 	"strings"
@@ -37,6 +38,8 @@ type UploadServerConfig struct {
 
 	// set global loglevel
 	LogLevel zerolog.Level `env:"LOG_LEVEL" envDefault:"info"`
+
+	TrustedReverseProxyRanges []*net.IPNet `env:"TRUSTED_REVERSE_PROXY_RANGES" envDefault:"10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7,127.0.0.0/8,::1/128"`
 }
 
 // LoadFromEnv populates the config from the process environment and .env file
@@ -55,9 +58,18 @@ func (cfg *UploadServerConfig) LoadFromEnv() {
 	err = env.ParseWithFuncs(cfg, env.CustomParsers{
 		reflect.TypeOf(zerolog.DebugLevel): logLevelParser,
 		reflect.TypeOf(datasize.B):         byteSizeParser,
+		reflect.TypeOf([]*net.IPNet{}):     ipNetSliceParser,
 	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to parse config")
+	}
+
+	if len(cfg.TrustedReverseProxyRanges) > 0 {
+		var trustedCidrs []string
+		for _, cidr := range cfg.TrustedReverseProxyRanges {
+			trustedCidrs = append(trustedCidrs, cidr.String())
+		}
+		log.Debug().Strs("trustedCidrs", trustedCidrs).Msg("Trusting reverse proxies")
 	}
 
 	zerolog.SetGlobalLevel(cfg.LogLevel)
@@ -91,4 +103,18 @@ func byteSizeParser(v string) (interface{}, error) {
 		return nil, err
 	}
 	return bytes, nil
+}
+
+func ipNetSliceParser(v string) (interface{}, error) {
+	cidrStrings := strings.Split(v, ",")
+	var cidrs []*net.IPNet
+	for _, cidrString := range cidrStrings {
+		_, cidr, err := net.ParseCIDR(cidrString)
+		if err != nil {
+			log.Error().Err(err).Str("cidrString", cidrString).Msg("failed to parse CIDR")
+			return nil, err
+		}
+		cidrs = append(cidrs, cidr)
+	}
+	return cidrs, nil
 }
