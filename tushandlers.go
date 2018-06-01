@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/tus/tusd/cmd/tusd/cli"
@@ -182,7 +183,16 @@ func (serv *UploadServer) getDirectOrForwardedRemoteIP(req *http.Request) (strin
 	// use X-Forwarded-For header if direct IP is a trusted reverse proxy
 	if forwardedFor := req.Header.Get("X-Forwarded-For"); forwardedFor != "" {
 		if serv.remoteIPisTrusted(net.ParseIP(remoteIP)) {
-			return forwardedFor, nil
+			// We do not check intermediary proxies against the whitelist.
+			// If a trusted proxy is appending to and forwarding the value of the
+			// header it is receiving, that is an implicit expression of trust
+			// which we will honor transitively.
+
+			// take the first comma delimited address
+			// this is the original client address
+			parts := strings.Split(forwardedFor, ",")
+			client := strings.TrimSpace(parts[0])
+			return client, nil
 		}
 		log.Warn().
 			Str("X-Forwarded-For", forwardedFor).
