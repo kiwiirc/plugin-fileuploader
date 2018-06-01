@@ -185,6 +185,8 @@ func (serv *UploadServer) ipRecorder(broadcaster *events.TusEventBroadcaster) {
 
 				ip := net.ParseIP(remoteIPStr)
 
+				ipBytes := []byte(ip)
+
 				if ip == nil {
 					log.Error().
 						Str("ip", remoteIPStr).
@@ -201,7 +203,7 @@ func (serv *UploadServer) ipRecorder(broadcaster *events.TusEventBroadcaster) {
 					UPDATE uploads
 					SET uploader_ip = ?
 					WHERE id = ?
-				`, ip, event.Info.ID)
+				`, ipBytes, event.Info.ID)
 
 				if err != nil {
 					log.Error().
