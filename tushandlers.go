@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	goLog "log"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/tus/tusd/cmd/tusd/cli"
@@ -127,7 +129,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 
 func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		err := addRemoteIPToMetadata(c.Request)
+		err := serv.addRemoteIPToMetadata(c.Request)
 		if err != nil {
 			if addrErr, ok := err.(*net.AddrError); ok {
 				c.AbortWithError(http.StatusInternalServerError, addrErr).SetType(gin.ErrorTypePrivate)
@@ -141,7 +143,7 @@ func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFun
 	}
 }
 
-func addRemoteIPToMetadata(req *http.Request) (err error) {
+func (serv *UploadServer) addRemoteIPToMetadata(req *http.Request) (err error) {
 	const uploadMetadataHeader = "Upload-Metadata"
 	const remoteIPKey = "RemoteIP"
 
@@ -154,13 +156,10 @@ func addRemoteIPToMetadata(req *http.Request) (err error) {
 		}
 	}
 
-	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
-
+	// determine the originating IP
+	remoteIP, err := serv.getDirectOrForwardedRemoteIP(req)
 	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Could not split address into host and port")
-		return
+		return err
 	}
 
 	// add RemoteIP to metadata
@@ -170,6 +169,63 @@ func addRemoteIPToMetadata(req *http.Request) (err error) {
 	req.Header.Set(uploadMetadataHeader, serializeMeta(metadata))
 
 	return
+}
+
+// ErrInvalidXForwardedFor occurs if the X-Forwarded-For header is trusted but invalid
+var ErrInvalidXForwardedFor = errors.New("Failed to parse IP from X-Forwarded-For header")
+
+func (serv *UploadServer) getDirectOrForwardedRemoteIP(req *http.Request) (string, error) {
+	// extract direct IP
+	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Could not split address into host and port")
+		return "", err
+	}
+
+	// use X-Forwarded-For header if direct IP is a trusted reverse proxy
+	if forwardedFor := req.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+		if serv.remoteIPisTrusted(net.ParseIP(remoteIP)) {
+			// We do not check intermediary proxies against the whitelist.
+			// If a trusted proxy is appending to and forwarding the value of the
+			// header it is receiving, that is an implicit expression of trust
+			// which we will honor transitively.
+
+			// take the first comma delimited address
+			// this is the original client address
+			parts := strings.Split(forwardedFor, ",")
+			forwardedForClient := strings.TrimSpace(parts[0])
+			forwardedForIP := net.ParseIP(forwardedForClient)
+			if forwardedForIP == nil {
+				err := ErrInvalidXForwardedFor
+				log.Error().
+					Err(err).
+					Str("client", forwardedForClient).
+					Str("remoteIP", remoteIP).
+					Msg("Couldn't use trusted X-Forwarded-For header")
+				return "", err
+			}
+			return forwardedForIP.String(), nil
+		}
+		log.Warn().
+			Str("X-Forwarded-For", forwardedFor).
+			Str("remoteIP", remoteIP).
+			Msg("Untrusted remote attempted to override stored IP")
+	}
+
+	// otherwise use direct IP
+	return remoteIP, nil
+}
+
+func (serv *UploadServer) remoteIPisTrusted(remoteIP net.IP) bool {
+	// check if remote IP is a trusted reverse proxy
+	for _, trustedNet := range serv.cfg.TrustedReverseProxyRanges {
+		if trustedNet.Contains(remoteIP) {
+			return true
+		}
+	}
+	return false
 }
 
 func (serv *UploadServer) ipRecorder(broadcaster *events.TusEventBroadcaster) {
