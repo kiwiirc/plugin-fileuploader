@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	goLog "log"
@@ -170,6 +171,9 @@ func (serv *UploadServer) addRemoteIPToMetadata(req *http.Request) (err error) {
 	return
 }
 
+// ErrInvalidXForwardedFor occurs if the X-Forwarded-For header is trusted but invalid
+var ErrInvalidXForwardedFor = errors.New("Failed to parse IP from X-Forwarded-For header")
+
 func (serv *UploadServer) getDirectOrForwardedRemoteIP(req *http.Request) (string, error) {
 	// extract direct IP
 	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
@@ -191,8 +195,18 @@ func (serv *UploadServer) getDirectOrForwardedRemoteIP(req *http.Request) (strin
 			// take the first comma delimited address
 			// this is the original client address
 			parts := strings.Split(forwardedFor, ",")
-			client := strings.TrimSpace(parts[0])
-			return client, nil
+			forwardedForClient := strings.TrimSpace(parts[0])
+			forwardedForIP := net.ParseIP(forwardedForClient)
+			if forwardedForIP == nil {
+				err := ErrInvalidXForwardedFor
+				log.Error().
+					Err(err).
+					Str("client", forwardedForClient).
+					Str("remoteIP", remoteIP).
+					Msg("Couldn't use trusted X-Forwarded-For header")
+				return "", err
+			}
+			return forwardedForIP.String(), nil
 		}
 		log.Warn().
 			Str("X-Forwarded-For", forwardedFor).
