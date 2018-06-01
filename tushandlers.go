@@ -237,29 +237,18 @@ func (serv *UploadServer) ipRecorder(broadcaster *events.TusEventBroadcaster) {
 		}
 		if event.Type == cli.HookPostCreate {
 			go func() {
-				remoteIPStr := event.Info.MetaData["RemoteIP"]
-
-				ip := net.ParseIP(remoteIPStr)
-
-				ipBytes := []byte(ip)
-
-				if ip == nil {
-					log.Error().
-						Str("ip", remoteIPStr).
-						Msg("Failed to parse IP address")
-					return
-				}
+				ip := event.Info.MetaData["RemoteIP"]
 
 				log.Debug().
 					Str("id", event.Info.ID).
-					Str("ip", ip.String()).
+					Str("ip", ip).
 					Msg("Recording uploader IP")
 
 				err := db.UpdateRow(serv.DBConn.DB, `
 					UPDATE uploads
 					SET uploader_ip = ?
 					WHERE id = ?
-				`, ipBytes, event.Info.ID)
+				`, ip, event.Info.ID)
 
 				if err != nil {
 					log.Error().
