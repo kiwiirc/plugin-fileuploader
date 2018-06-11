@@ -13,16 +13,24 @@ after a set time period discourages users from using the server as a permanent f
 * yarn (https://yarnpkg.com/ - for the kiwiirc plugin UI)
 * dep (https://github.com/golang/dep - for the server)
 
-#### Running the file upload server
 
-The file upload web server stores the files on the server and serves them to kiwi users.
+#### Downloading the file upload server's source code
+
+```console
+$ go get github.com/kiwiirc/plugin-fileuploader
+$ cd "$(go env GOPATH)/src/github.com/kiwiirc/plugin-fileuploader"
+```
+
+#### Running the file upload server from source
+
 ```console
 $ dep ensure
 $ go run *.go
 ```
 
-To build the server for production:
+#### Building the server for production
 ```console
+$ dep ensure
 $ go build -o fileuploader *.go
 ```
 
