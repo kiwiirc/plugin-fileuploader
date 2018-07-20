@@ -49,6 +49,8 @@ func (store *ShardedFileStore) initDB() {
 	}
 
 	if n > 0 {
-		log.Info().Int("count", n).Msg("Applied schema migrations")
+		log.Info().
+			Str("event", "schema_migrations").
+			Int("count", n).Msg("Applied schema migrations")
 	}
 }

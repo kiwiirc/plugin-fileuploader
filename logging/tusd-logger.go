@@ -4,6 +4,7 @@ package logging
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/kiwiirc/plugin-fileuploader/events"
 	"github.com/rs/zerolog/log"
@@ -22,6 +23,7 @@ func TusdLogger(broadcaster *events.TusEventBroadcaster) {
 
 func handleTusEvent(event *events.TusEvent) {
 	logEvent := log.Info().
+		Str("event", strings.Replace(string(event.Type), "-", "_", -1)).
 		Str("id", event.Info.ID).
 		Int64("size", event.Info.Size).
 		Int64("offset", event.Info.Offset)

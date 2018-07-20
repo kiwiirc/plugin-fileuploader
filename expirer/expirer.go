@@ -51,7 +51,9 @@ func (expirer *Expirer) Stop() {
 }
 
 func (expirer *Expirer) gc(t time.Time) {
-	log.Debug().Msg("Filestore GC tick")
+	log.Debug().
+		Str("event", "gc_tick").
+		Msg("Filestore GC tick")
 
 	expiredIds, err := expirer.getExpired()
 	if err != nil {
@@ -70,6 +72,7 @@ func (expirer *Expirer) gc(t time.Time) {
 			continue
 		}
 		log.Info().
+			Str("event", "expired").
 			Str("id", id).
 			Msg("Terminated upload id")
 	}

@@ -27,7 +27,9 @@ func main() {
 	go runServer(reloadRequested, done, &wg)
 
 	wg.Wait()
-	log.Info().Msg("Shutdown complete")
+	log.Info().
+		Str("event", "shutdown").
+		Msg("Shutdown complete")
 }
 
 func signalHandler(reloadRequested, done chan struct{}) {
@@ -69,6 +71,7 @@ func runServer(reloadRequested, done chan struct{}, wg *sync.WaitGroup) {
 		// wait for startup to complete
 		<-serv.GetStartedChan()
 		log.Info().
+			Str("event", "startup").
 			Str("address", serv.cfg.ListenAddr).
 			Msg("Server listening")
 
@@ -95,12 +98,16 @@ func runServer(reloadRequested, done chan struct{}, wg *sync.WaitGroup) {
 					// server instance while we've already replaced it as the listener
 					// for new connections.
 					go func() {
-						log.Info().Msg("Reloading server config")
+						log.Info().
+							Str("event", "config_reload").
+							Msg("Reloading server config")
 						serv.Shutdown()
 					}()
 
 				case <-done:
-					log.Info().Msg("Shutdown initiated. Handling existing requests")
+					log.Info().
+						Str("event", "shutdown_started").
+						Msg("Shutdown initiated. Handling existing requests")
 					serv.Shutdown()
 					wg.Done()
 					return false
