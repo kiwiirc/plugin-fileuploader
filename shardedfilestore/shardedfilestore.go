@@ -213,6 +213,7 @@ func (store *ShardedFileStore) Terminate(id string) error {
 			return err
 		}
 		log.Info().
+			Str("event", "blob_deleted").
 			Str("binPath", binPath).
 			Msg("Removed upload bin")
 	}
@@ -390,7 +391,9 @@ func (store *ShardedFileStore) writeInfo(id string, info tusd.FileInfo) error {
 
 // FinishUpload deduplicates the upload by its cryptographic hash
 func (store *ShardedFileStore) FinishUpload(id string) error {
-	log.Debug().Str("id", id).Msg("Finishing upload")
+	log.Debug().
+		Str("event", "upload_finished").
+		Str("id", id).Msg("Finishing upload")
 
 	// calculate hash
 	hash, err := store.hashFile(id)

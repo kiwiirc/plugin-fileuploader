@@ -33,6 +33,7 @@ func GinLogger() gin.HandlerFunc {
 		}
 
 		logEvent.
+			Str("event", "http_request").
 			Int("status", status).
 			Dur("duration", duration).
 			Str("client", c.ClientIP()).
