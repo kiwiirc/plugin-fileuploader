@@ -144,7 +144,8 @@ func (store *ShardedFileStore) getDuplicateCount(id string) (duplicates int, err
 		FROM uploads
 		WHERE
 			sha256sum = ? AND
-			id != ?
+			id != ? AND
+			deleted = 0
 	`, hash, id).Scan(&duplicates)
 
 	return
