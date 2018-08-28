@@ -14,6 +14,9 @@ function getValidUploadTarget() {
 }
 
 kiwi.plugin('fileuploader', function(kiwi, log) {
+	// exposed api object
+	kiwi.fileuploader = {}
+
 	const settings = kiwi.state.setting('fileuploader')
 
 	// add button to input bar
@@ -45,6 +48,10 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 		.run()
 
 	const dashboard = uppy.getPlugin('Dashboard')
+
+	// expose plugin api
+	kiwi.fileuploader.uppy = uppy
+	kiwi.fileuploader.dashboard = dashboard
 
 	// show uppy modal whenever a file is dragged over the page
 	window.addEventListener('dragenter', event => {
