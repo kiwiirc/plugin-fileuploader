@@ -13,6 +13,18 @@ function getValidUploadTarget() {
 	return buffer
 }
 
+// doesn't count a final trailing newline as starting a new line
+function numLines(str) {
+	const re = /\r?\n/g
+	let lines = 1
+	while (re.exec(str)) {
+		if (re.lastIndex < str.length) {
+			lines += 1
+		}
+	}
+	return lines
+}
+
 kiwi.plugin('fileuploader', function(kiwi, log) {
 	// exposed api object
 	kiwi.fileuploader = {}
@@ -61,10 +73,39 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 	// show uppy modal when files are pasted
 	kiwi.on('buffer.paste', event => {
 		// IE 11 puts the clipboardData on the window
-		const cbData = event.clipboardData || window.clipboardData;
+		const cbData = event.clipboardData || window.clipboardData
+
+		if (!cbData) {
+			return
+		}
+
+		// detect large text pastes, offer to create a file upload instead
+		const text = cbData.getData('text')
+		if (text) {
+			const network = kiwi.state.getActiveNetwork()
+			const networkMaxLineLen = network.ircClient.options.message_max_length
+			if (text.length > networkMaxLineLen || numLines(text) > 4) {
+				const msg = 'You pasted a lot of text.\nWould you like to upload as a file instead?'
+				if (window.confirm(msg)) {
+					// stop IrcInput from ingesting the pasted text
+					event.preventDefault()
+					event.stopPropagation()
+
+					uppy.addFile({
+						name: 'pasted.txt',
+						type: 'text/plain',
+						data: new Blob([text], { type: 'text/plain' }),
+						source: 'Local',
+						isRemote: false,
+					})
+
+					dashboard.openModal()
+				}
+			}
+		}
 
 		// ensure a file has been pasted
-		if (cbData && cbData.files.length <= 0) {
+		if (!cbData.files || cbData.files.length <= 0) {
 			return
 		}
 
