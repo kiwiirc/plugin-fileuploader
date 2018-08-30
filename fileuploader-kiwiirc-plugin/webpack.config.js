@@ -3,6 +3,9 @@ const path = require('path');
 module.exports = {
   mode: 'production',
   entry: './plugin.js',
+  output: {
+    filename: 'plugin-fileuploader.js',
+  },
   module: {
     rules: [{
       test: /\.js$/,
@@ -20,8 +23,10 @@ module.exports = {
   },
   devtool: 'source-map',
   devServer: {
-      contentBase: path.join(__dirname, "dist"),
-      compress: true,
-      port: 9000
+    filename: 'plugin-fileuploader.js',
+    contentBase: path.join(__dirname, 'dist'),
+    compress: true,
+    host: process.env.HOST || 'localhost',
+    port: 41040,
   }
 };
