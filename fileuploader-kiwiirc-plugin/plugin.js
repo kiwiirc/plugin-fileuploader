@@ -91,6 +91,9 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 					event.preventDefault()
 					event.stopPropagation()
 
+					// only if there are no other files waiting for user confirmation to upload
+					const shouldAutoUpload = uppy.getFiles().length === 0
+
 					uppy.addFile({
 						name: 'pasted.txt',
 						type: 'text/plain',
@@ -98,6 +101,10 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 						source: 'Local',
 						isRemote: false,
 					})
+
+					if (shouldAutoUpload) {
+						uppy.upload()
+					}
 
 					dashboard.openModal()
 				}
