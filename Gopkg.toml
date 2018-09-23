@@ -39,8 +39,8 @@
 
 [[constraint]]
   name = "github.com/caarlos0/env"
-  branch = "fix-uint64-alias-custom-parser"
-  source = "github.com/vith/env"
+  branch = "master"
+  source = "github.com/caarlos0/env"
 [[constraint]]
   name = "github.com/joho/godotenv"
   version = "1.2.0"

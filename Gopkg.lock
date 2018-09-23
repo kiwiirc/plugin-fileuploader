@@ -90,13 +90,13 @@
   revision = "4eba002a5eaea69cf8d235a388fc6b65ae68d2dd"
 
 [[projects]]
-  branch = "fix-uint64-alias-custom-parser"
+  branch = "master"
   digest = "1:ca213cb5930952fe30353e61afaf03f3305f2c8f49275172d4a60c323ad38c24"
   name = "github.com/caarlos0/env"
   packages = ["."]
   pruneopts = "UT"
   revision = "61c4a202391f6bffb7fc8c179b5c59279cc57a0f"
-  source = "github.com/vith/env"
+  source = "github.com/caarlos0/env"
 
 [[projects]]
   branch = "master"
