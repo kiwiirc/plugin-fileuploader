@@ -91,11 +91,11 @@
 
 [[projects]]
   branch = "fix-uint64-alias-custom-parser"
-  digest = "1:ca213cb5930952fe30353e61afaf03f3305f2c8f49275172d4a60c323ad38c24"
+  digest = "1:9c7958791541c5ac896e83a56ad15fba977ef45c7196361b5e482a9d515f69f3"
   name = "github.com/caarlos0/env"
   packages = ["."]
   pruneopts = "UT"
-  revision = "61c4a202391f6bffb7fc8c179b5c59279cc57a0f"
+  revision = "299995ae5a64ca16ac0e7a879652ad46de62cbb4"
   source = "github.com/vith/env"
 
 [[projects]]
