@@ -50,6 +50,7 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
         .use(Dashboard, {
             trigger: uploadFileButton,
             proudlyDisplayPoweredByUppy: false,
+            closeModalOnClickOutside: true,
             note: settings.note,
         })
         .use(Webcam, { target: Dashboard })
