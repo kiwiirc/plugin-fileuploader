@@ -147,4 +147,8 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 			dashboard.closeModal()
 		}
 	})
+
+        window.onmousedown = e => {
+            if (e.srcElement.className === 'uppy-Dashboard-overlay') dashboard.closeModal()
+        }
 })
