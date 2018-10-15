@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"errors"
@@ -72,6 +72,8 @@ func (cfg *UploadServerConfig) LoadFromEnv() {
 		} else {
 			log.Fatal().Err(err).Msg("failed to load .env")
 		}
+	} else {
+		log.Debug().Msg(".env file loaded")
 	}
 
 	// populate config struct
