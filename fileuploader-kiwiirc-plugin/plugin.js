@@ -68,11 +68,17 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 
     // show uppy modal whenever a file is dragged over the page
     window.addEventListener('dragenter', event => {
+        // swallow error and ignore drag if no valid buffer to share to
+        try { getValidUploadTarget() } catch (err) { return }
+
         dashboard.openModal()
     })
 
     // show uppy modal when files are pasted
     kiwi.on('buffer.paste', event => {
+        // swallow error and ignore paste if no valid buffer to share to
+        try { getValidUploadTarget() } catch (err) { return }
+
         // IE 11 puts the clipboardData on the window
         const cbData = event.clipboardData || window.clipboardData
 
