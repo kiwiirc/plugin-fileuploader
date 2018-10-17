@@ -54,11 +54,8 @@ func signalHandler(reloadRequested, done chan struct{}) {
 }
 
 func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRouter *http.ServeMux) {
-	var replaceableHandler *ReplaceableHandler
-
-	if parentRouter != nil {
-		parentRouter.Handle("/files", replaceableHandler)
-	}
+	replaceableHandler := &ReplaceableHandler{}
+	registeredPrefixes := make(map[string]struct{}, 0)
 
 	for {
 		// new server instance
@@ -66,6 +63,22 @@ func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRout
 
 		// refresh config
 		serv.cfg.LoadFromEnv()
+
+		// register handler on parentRouter if any, when prefix has not been previously registered
+		if parentRouter != nil {
+			routePrefix, err := routePrefixFromBasePath(serv.cfg.BasePath)
+			if err != nil {
+				panic(err)
+			}
+			if _, ok := registeredPrefixes[routePrefix]; !ok { // this prefix not yet registered
+				registeredPrefixes[routePrefix] = struct{}{}
+				parentRouter.Handle(routePrefix, replaceableHandler)
+				log.Info().
+					Str("event", "startup").
+					Str("routePrefix", routePrefix).
+					Msg("Fileuploader handler mounted on parent router")
+			}
+		}
 
 		errChan := make(chan error)
 
@@ -84,10 +97,6 @@ func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRout
 				Str("event", "startup").
 				Str("address", serv.cfg.ListenAddr).
 				Msg("Server listening")
-		} else {
-			log.Info().
-				Str("event", "startup").
-				Msg("Fileuploader handler mounted on parent router")
 		}
 
 		// wait for error or reload request
