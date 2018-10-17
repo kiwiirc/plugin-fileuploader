@@ -14,7 +14,8 @@ func Start(gateway *webircgateway.Gateway, pluginsQuit *sync.WaitGroup) {
 	fmt.Println("fileuploader-server start")
 	gateway.Log(1, "Starting fileuploader-server plugin. webircgateway version: %s", webircgateway.Version)
 
-	server.RunServer(gateway.HttpRouter)
-
-	pluginsQuit.Done()
+	go func() {
+		defer pluginsQuit.Done()
+		server.RunServer(gateway.HttpRouter)
+	}()
 }
