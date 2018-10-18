@@ -45,7 +45,6 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 
     let fileList = []
 
-    // The component that gets shown in the messagelist when somebody joins a conference call
     var fileListComponent = kiwi.Vue.extend({
         template: `
             <div style="overflow: auto; background: #eee; height: 100%;">
