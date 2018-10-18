@@ -37,6 +37,130 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 
     kiwi.addUi('input', uploadFileButton)
 
+    // add button to input bar
+    const historyButton = document.createElement('i')
+    historyButton.className = 'history-button fa fa-history'
+
+    kiwi.addUi('input', historyButton)
+
+    let fileList = []
+
+    // The component that gets shown in the messagelist when somebody joins a conference call
+    var fileListComponent = kiwi.Vue.extend({
+        template: `
+            <div style="overflow: auto; background: #eee; height: 100%;">
+                <span v-if="isOpen" class="kiwi-sidebar-options">
+                    <div
+                        v-if="canPin"
+                        class="kiwi-sidebar-pin"
+                        @click="pin()"
+                    >
+                        <i class="fa fa-thumb-tack" aria-hidden="true"/>
+                    </div>
+                    <div class="kiwi-sidebar-close" @click="close()">
+                        {{ $t('close') }}<i class="fa fa-times" aria-hidden="true"/>
+                    </div>
+                </span>
+                <div v-if="!fileList.length" style="margin: 10px; font-family: arial, tahoma;">
+                    No new files have been uploaded!<br><br><br>Check back here to see the file history...
+                </div>
+                <div v-else style="margin: 10px; font-family: arial, tahoma;">
+                    Recently uploaded files...<br><br>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr><th></th><th>Nick</th><th>Link</th><th>Time</th></tr>
+                        <tr v-for="(file, idx) in fileList" :key="file" style="border-bottom: 1px solid #aaa;">
+                            <td style="border-bottom: 1px solid #aaa;">
+                                <button
+                                    @click="fileList.splice(idx,1)"
+                                    style="background: #f88; color: #822; border: none; border-radius: 5px; padding-left: 5px; padding-right: 5px; font-size: 18px; cursor: pointer;"
+                                >
+                                    <i class="fa fa-trash" aria-hidden="true"/>
+                                </button>
+                            </td>
+                            <td style="text-align: center; border-bottom: 1px solid #aaa;">
+                                {{file.nick}}
+                            </td>
+                            <td style="border-bottom: 1px solid #aaa;">
+                                <button
+                                    @click="loadContent(file.url)"
+                                    style="width: 100%; border: none; background: #8f8; border-radius: 5px; text-decoration: underline; cursor: pointer;"
+                                >
+                                    {{getFileName(file.url)}}
+                                </button>
+                            </td>
+                            <td style="text-align: center; border-bottom: 1px solid #aaa;">
+                                {{file.time}}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        `,
+        data() {
+            return {
+                sidebarOpen: true,
+                fileList,
+            };
+        },
+        computed: {
+            isPinned() {
+                // Pinned sidebar only works on full width windows otherwise its too small to see
+                return this.sidebarPinned && this.canPin;
+            },
+            isOpen() {
+                return !this.isPinned && this.sidebarOpen;
+            },
+            isClosed() {
+                return !this.isOpen && !this.isPinned;
+            },
+            canPin() {
+                return kiwi.state.ui.app_width > 769;
+            },
+            sidebarPinned() {
+                return kiwi.state.setting('sidebarPinned');
+            },
+        },
+        methods: {
+            close() {
+                kiwi.emit('sidebar.hide');
+            },
+            pin() {
+                kiwi.state.setting('sidebarPinned', true);
+            },
+            getFileName(file) {
+                let name = file.split('/')[file.split('/').length-1];
+                if (name.length >= 25) {
+                    name = name.substring(0, 18) + '...' + name.substring(name.length - 4);
+                }
+                return name;
+            },
+            loadContent(url) {
+                kiwi.emit('mediaviewer.show', url);
+            },
+        },
+    });
+
+    historyButton.onclick = e => {
+        kiwi.emit("sidebar.show")
+        kiwi.emit('sidebar.component', fileListComponent)
+    }
+
+    kiwi.on('message.new', e => {
+        if (e.message.indexOf(settings.server) !== -1) {
+            let currentdate = new Date(); 
+            let time = currentdate.getHours() + ":"  
+                + currentdate.getMinutes() + ":" 
+                + currentdate.getSeconds();
+            let link = {
+                url: e.message.substring(e.message.indexOf(settings.server)),
+                nick: e.nick,
+                time 
+            };
+            link.url = link.url.split(' ')[0].split(')')[0]
+            fileList.push(link);
+        }
+    })
+
     const uppy = Uppy({
         autoProceed: false,
         onBeforeFileAdded: (currentFile, files) => {
