@@ -26,6 +26,22 @@
   version = "v0.6.0"
 
 [[projects]]
+  digest = "1:9f3b30d9f8e0d7040f729b82dcbc8f0dead820a133b3147ce355fc451f32d761"
+  name = "github.com/BurntSushi/toml"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "3012a1dbe2e4bd1391d42b32f0577cb7bbc7f005"
+  version = "v0.3.1"
+
+[[projects]]
+  digest = "1:3261411fa3369515015a5957d3b9881b806b8457025a034a7722dc3732fe15e8"
+  name = "github.com/OneOfOne/xxhash"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "6def279d2ce6c81a79dd1c1be580f03bb216fb8a"
+  version = "v1.2.2"
+
+[[projects]]
   digest = "1:d128bb41bb76745c62ffc652051f6800117dde46601db31d29df291fea10d0d5"
   name = "github.com/aws/aws-sdk-go"
   packages = [
@@ -99,6 +115,14 @@
   source = "github.com/vith/env"
 
 [[projects]]
+  digest = "1:76dc72490af7174349349838f2fe118996381b31ea83243812a97e5a0fd5ed55"
+  name = "github.com/dgrijalva/jwt-go"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "06ea1031745cb8b3dab3f6a236daf2b0aa468b7e"
+  version = "v3.2.0"
+
+[[projects]]
   branch = "master"
   digest = "1:36fe9527deed01d2a317617e59304eb2c4ce9f8a24115bcc5c2e37b3aee5bae4"
   name = "github.com/gin-contrib/sse"
@@ -136,6 +160,23 @@
   version = "v1.4.0"
 
 [[projects]]
+  digest = "1:9ae31ce33b4bab257668963e844d98765b44160be4ee98cafc44637a213e530d"
+  name = "github.com/gobwas/glob"
+  packages = [
+    ".",
+    "compiler",
+    "match",
+    "syntax",
+    "syntax/ast",
+    "syntax/lexer",
+    "util/runes",
+    "util/strings",
+  ]
+  pruneopts = "UT"
+  revision = "5ccd90ef52e1e632236f7326478d4faa74f99438"
+  version = "v0.2.3"
+
+[[projects]]
   digest = "1:5d1b5a25486fc7d4e133646d834f6fca7ba1cef9903d40e7aa786c41b89e9e91"
   name = "github.com/golang/protobuf"
   packages = [
@@ -156,6 +197,22 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "317e0006254c44a0ac427cc52a0e083ff0b9622f"
+  version = "v2.0.0"
+
+[[projects]]
+  digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
+  name = "github.com/gorilla/websocket"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "66b9c49e59c6c48f0ffce28c2d8b8a5678502c6d"
+  version = "v1.4.0"
+
+[[projects]]
+  digest = "1:7a23929a5a0d4266c8f5444dae1e7594dbb0cae1c3091834119b162f81e229ff"
+  name = "github.com/igm/sockjs-go"
+  packages = ["sockjs"]
+  pruneopts = "UT"
+  revision = "d276e9ffe5cc5c271b81198cc77a2adf6c4482d2"
   version = "v2.0.0"
 
 [[projects]]
@@ -180,6 +237,20 @@
   pruneopts = "UT"
   revision = "1624edc4454b8682399def8740d46db5e4362ba4"
   version = "v1.1.5"
+
+[[projects]]
+  branch = "master"
+  digest = "1:9c687e9ae18a7ef63ee1a71c9cfa775444f2bbf98a6e118537c8fa5fd882b49b"
+  name = "github.com/kiwiirc/webircgateway"
+  packages = [
+    "pkg/identd",
+    "pkg/irc",
+    "pkg/proxy",
+    "pkg/recaptcha",
+    "pkg/webircgateway",
+  ]
+  pruneopts = "UT"
+  revision = "a1e11f6f9d07c25f63a5b7bd5ca707e3ae889bea"
 
 [[projects]]
   digest = "1:0981502f9816113c9c8c4ac301583841855c8cf4da8c72f696b3ebedf6d0e4e5"
@@ -220,6 +291,14 @@
   pruneopts = "UT"
   revision = "4b7aa43c6742a2c18fdef89dd197aaae7dac7ccd"
   version = "1.0.1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:f7aa53146bf79462509d4ce136826ebbd64907e4679e1b04e62758da6b68e589"
+  name = "github.com/orcaman/concurrent-map"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "b28018939af9022337862b94a463abb18abb3e0e"
 
 [[projects]]
   digest = "1:b6221ec0f8903b556e127c449e7106b63e6867170c2d10a7c058623d086f2081"
@@ -351,17 +430,32 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1c14517b2f106c61d75006199b46a46576058661d469658cb0f90739919641d2"
+  digest = "1:dedf20eb0d3e8d6aa8a4d3d2fae248222b688ed528201995e152cc497899123c"
+  name = "golang.org/x/crypto"
+  packages = [
+    "acme",
+    "acme/autocert",
+  ]
+  pruneopts = "UT"
+  revision = "0c41d7ab0a0ee717d4590a44bcb987dfd9e183eb"
+
+[[projects]]
+  branch = "master"
+  digest = "1:c93eb0679a2979c0484a9ed90cb26b6080c136dc812b90daa0b7f32a5b09bb2c"
   name = "golang.org/x/net"
   packages = [
     "context",
     "context/ctxhttp",
+    "html",
+    "html/atom",
+    "html/charset",
     "http/httpguts",
     "http2",
     "http2/hpack",
     "idna",
     "internal/timeseries",
     "trace",
+    "websocket",
   ]
   pruneopts = "UT"
   revision = "8a410e7b638dca158bf9e766925842f6651ff828"
@@ -389,17 +483,29 @@
   revision = "ebe1bf3edb3325c393447059974de898d5133eb8"
 
 [[projects]]
-  digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
+  digest = "1:436b24586f8fee329e0dd65fd67c817681420cda1d7f934345c13fe78c212a73"
   name = "golang.org/x/text"
   packages = [
     "collate",
     "collate/build",
+    "encoding",
+    "encoding/charmap",
+    "encoding/htmlindex",
+    "encoding/internal",
+    "encoding/internal/identifier",
+    "encoding/japanese",
+    "encoding/korean",
+    "encoding/simplifiedchinese",
+    "encoding/traditionalchinese",
+    "encoding/unicode",
     "internal/colltab",
     "internal/gen",
     "internal/tag",
     "internal/triegen",
     "internal/ucd",
+    "internal/utf8internal",
     "language",
+    "runes",
     "secure/bidirule",
     "transform",
     "unicode/bidi",
@@ -522,6 +628,14 @@
   version = "v1.7.1"
 
 [[projects]]
+  digest = "1:15e27372d379b45b18ac917b9dafc45c45485239490ece18cca97a12f9591146"
+  name = "gopkg.in/ini.v1"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "9c8236e659b76e87bf02044d06fde8683008ff3e"
+  version = "v1.39.0"
+
+[[projects]]
   digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
@@ -533,11 +647,13 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/BurntSushi/toml",
     "github.com/c2h5oh/datasize",
     "github.com/caarlos0/env",
     "github.com/gin-gonic/gin",
     "github.com/go-sql-driver/mysql",
     "github.com/joho/godotenv",
+    "github.com/kiwiirc/webircgateway/pkg/webircgateway",
     "github.com/mattn/go-sqlite3",
     "github.com/rs/zerolog",
     "github.com/rs/zerolog/log",

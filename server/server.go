@@ -63,13 +63,17 @@ func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRout
 	for {
 		// new server instance
 		serv := UploadServer{}
+		serv.cfg = *NewConfig()
 
 		// refresh config
-		serv.cfg.LoadFromEnv()
+		err := serv.cfg.Load()
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to load config")
+		}
 
 		// register handler on parentRouter if any, when prefix has not been previously registered
 		if parentRouter != nil {
-			routePrefix, err := routePrefixFromBasePath(serv.cfg.BasePath)
+			routePrefix, err := routePrefixFromBasePath(serv.cfg.Server.BasePath)
 			if err != nil {
 				panic(err)
 			}
@@ -98,7 +102,7 @@ func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRout
 		if parentRouter == nil {
 			log.Info().
 				Str("event", "startup").
-				Str("address", serv.cfg.ListenAddr).
+				Str("address", serv.cfg.Server.ListenAddress).
 				Msg("Server listening")
 		}
 

@@ -4,11 +4,9 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/kiwiirc/plugin-fileuploader/db"
-
-	"github.com/kiwiirc/plugin-fileuploader/events"
-
 	"github.com/gin-gonic/gin"
+	"github.com/kiwiirc/plugin-fileuploader/db"
+	"github.com/kiwiirc/plugin-fileuploader/events"
 	"github.com/kiwiirc/plugin-fileuploader/expirer"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
@@ -17,7 +15,7 @@ import (
 // UploadServer is a simple configurable service for file sharing.
 // Compatible with TUS upload clients.
 type UploadServer struct {
-	cfg                 UploadServerConfig
+	cfg                 Config
 	DBConn              *db.DatabaseConnection
 	store               *shardedfilestore.ShardedFileStore
 	Router              *gin.Engine
@@ -50,20 +48,20 @@ func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 	serv.Router.Use(logging.GinLogger(), gin.Recovery())
 
 	serv.DBConn = db.ConnectToDB(db.DBConfig{
-		DriverName: serv.cfg.DBType,
-		DSN:        serv.cfg.DBPath,
+		DriverName: serv.cfg.Database.Type,
+		DSN:        serv.cfg.Database.Path,
 	})
 
 	serv.store = shardedfilestore.New(
-		serv.cfg.StoragePath,
-		serv.cfg.StorageShardLayers,
+		serv.cfg.Storage.Path,
+		serv.cfg.Storage.ShardLayers,
 		serv.DBConn,
 	)
 
 	serv.expirer = expirer.New(
 		serv.store,
-		serv.cfg.ExpirationAge,
-		serv.cfg.ExpirationCheckInterval,
+		serv.cfg.Expiration.MaxAge.Duration,
+		serv.cfg.Expiration.CheckInterval.Duration,
 	)
 
 	err := serv.registerTusHandlers(serv.Router, serv.store)
@@ -82,7 +80,7 @@ func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 
 	// otherwise run our own http server
 	serv.httpServer = &http.Server{
-		Addr:    serv.cfg.ListenAddr,
+		Addr:    serv.cfg.Server.ListenAddress,
 		Handler: serv.Router,
 	}
 

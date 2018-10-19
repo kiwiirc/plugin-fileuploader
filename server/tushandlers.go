@@ -11,15 +11,14 @@ import (
 	"path"
 	"strings"
 
-	"github.com/rs/zerolog/log"
-	"github.com/tus/tusd/cmd/tusd/cli"
-
 	"github.com/gin-gonic/gin"
 	"github.com/kiwiirc/plugin-fileuploader/db"
 	"github.com/kiwiirc/plugin-fileuploader/events"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
+	"github.com/rs/zerolog/log"
 	"github.com/tus/tusd"
+	"github.com/tus/tusd/cmd/tusd/cli"
 )
 
 func routePrefixFromBasePath(basePath string) (string, error) {
@@ -60,11 +59,11 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
 
-	maximumUploadSize := serv.cfg.MaximumUploadSize
+	maximumUploadSize := serv.cfg.Storage.MaximumUploadSize
 	log.Debug().Str("size", maximumUploadSize.String()).Msg("Using upload limit")
 
 	config := tusd.Config{
-		BasePath:                serv.cfg.BasePath,
+		BasePath:                serv.cfg.Server.BasePath,
 		StoreComposer:           composer,
 		MaxSize:                 int64(maximumUploadSize.Bytes()),
 		Logger:                  goLog.New(ioutil.Discard, "", 0),
@@ -74,7 +73,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 		NotifyUploadProgress:    true,
 	}
 
-	routePrefix, err := routePrefixFromBasePath(serv.cfg.BasePath)
+	routePrefix, err := routePrefixFromBasePath(serv.cfg.Server.BasePath)
 	if err != nil {
 		return err
 	}
@@ -99,7 +98,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	// When attached to the RouterGroup, it does not get called for some requests.
 	tusdMiddleware := gin.WrapH(handler.Middleware(noopHandler))
 	r.Use(tusdMiddleware)
-	r.Use(customizedCors(serv.cfg.CorsOrigins))
+	r.Use(customizedCors(serv.cfg.Server.CorsOrigins))
 
 	rg := r.Group(routePrefix)
 	rg.POST("", serv.postFile(handler))
@@ -220,7 +219,7 @@ func (serv *UploadServer) getDirectOrForwardedRemoteIP(req *http.Request) (strin
 
 func (serv *UploadServer) remoteIPisTrusted(remoteIP net.IP) bool {
 	// check if remote IP is a trusted reverse proxy
-	for _, trustedNet := range serv.cfg.TrustedReverseProxyRanges {
+	for _, trustedNet := range serv.cfg.Server.TrustedReverseProxyRanges {
 		if trustedNet.Contains(remoteIP) {
 			return true
 		}
