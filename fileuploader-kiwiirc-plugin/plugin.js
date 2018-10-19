@@ -70,6 +70,7 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
                         <tr v-for="(file, idx) in fileList" :key="file" style="border-bottom: 1px solid #aaa;">
                             <td style="border-bottom: 1px solid #aaa;">
                                 <button
+                                    :href="file.url"
                                     @click="fileList.splice(idx,1)"
                                     style="background: #f88; color: #822; border: none; border-radius: 5px; padding-left: 5px; padding-right: 5px; font-size: 18px; cursor: pointer;"
                                 >
@@ -80,12 +81,13 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
                                 {{file.nick}}
                             </td>
                             <td style="border-bottom: 1px solid #aaa;">
-                                <button
-                                    @click="loadContent(file.url)"
-                                    style="width: 100%; border: none; background: #8f8; border-radius: 5px; text-decoration: underline; cursor: pointer;"
+                                <a
+                                    :href="file.url"
+                                    @click.prevent.stop="loadContent(file.url)"
+                                    style="display: inline-block; text-align: center; width: 100%; border: none; background: #8f8; border-radius: 5px; text-decoration: underline; cursor: pointer;"
                                 >
                                     {{getFileName(file.url)}}
-                                </button>
+                                </a>
                             </td>
                             <td style="text-align: center; border-bottom: 1px solid #aaa;">
                                 {{file.time}}
