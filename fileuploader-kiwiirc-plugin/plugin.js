@@ -87,7 +87,6 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
         `,
         data() {
             return {
-                sidebarOpen: true,
                 fileList,
             };
         },
