@@ -48,18 +48,6 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
     var fileListComponent = kiwi.Vue.extend({
         template: `
             <div style="overflow: auto; background: #eee; height: 100%;">
-                <span v-if="isOpen" class="kiwi-sidebar-options">
-                    <div
-                        v-if="canPin"
-                        class="kiwi-sidebar-pin"
-                        @click="pin()"
-                    >
-                        <i class="fa fa-thumb-tack" aria-hidden="true"/>
-                    </div>
-                    <div class="kiwi-sidebar-close" @click="close()">
-                        {{ $t('close') }}<i class="fa fa-times" aria-hidden="true"/>
-                    </div>
-                </span>
                 <div v-if="!fileList.length" style="margin: 10px; font-family: arial, tahoma;">
                     No new files have been uploaded!<br><br><br>Check back here to see the file history...
                 </div>
@@ -103,31 +91,7 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
                 fileList,
             };
         },
-        computed: {
-            isPinned() {
-                // Pinned sidebar only works on full width windows otherwise its too small to see
-                return this.sidebarPinned && this.canPin;
-            },
-            isOpen() {
-                return !this.isPinned && this.sidebarOpen;
-            },
-            isClosed() {
-                return !this.isOpen && !this.isPinned;
-            },
-            canPin() {
-                return kiwi.state.ui.app_width > 769;
-            },
-            sidebarPinned() {
-                return kiwi.state.setting('sidebarPinned');
-            },
-        },
         methods: {
-            close() {
-                kiwi.emit('sidebar.hide');
-            },
-            pin() {
-                kiwi.state.setting('sidebarPinned', true);
-            },
             getFileName(file) {
                 let name = file.split('/')[file.split('/').length-1];
                 if (name.length >= 25) {
