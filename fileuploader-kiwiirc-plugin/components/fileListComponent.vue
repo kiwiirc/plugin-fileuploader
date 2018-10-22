@@ -1,6 +1,6 @@
 <template>
     <div class="kiwi-filebuffer-outer-container">
-        <div v-if="!fileList.length" class="kiwi-filebuffer-status-message">
+        <div v-if="typeof fileList === 'undefined' || !fileList.length" class="kiwi-filebuffer-status-message">
             No new files have been uploaded!<br><br><br>
             Check back here to see the file history...
         </div>
@@ -62,6 +62,7 @@ export default {
         },
     },
 }
+</script>
 
 <style scoped>
 .kiwi-filebuffer-outer-container {

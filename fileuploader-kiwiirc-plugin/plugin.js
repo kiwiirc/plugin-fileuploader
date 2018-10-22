@@ -44,12 +44,12 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 
     kiwi.addUi('input', historyButton)
 
-    let fileList = []
-
     historyButton.onclick = e => {
         kiwi.emit("sidebar.show")
         kiwi.showInSidebar(fileListComponent)
     }
+
+    let fileList = []
 
     kiwi.on('message.new', e => {
         if (e.message.indexOf(settings.server) !== -1) {
