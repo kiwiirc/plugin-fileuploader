@@ -1,5 +1,6 @@
 import { Core as Uppy, Dashboard, Tus, Webcam } from 'uppy'
 import 'uppy/dist/uppy.min.css'
+import fileListComponent from './components/fileListComponent.vue'
 
 const KiB = 2 ** 10
 const MiB = 2 ** 20
@@ -45,68 +46,9 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 
     let fileList = []
 
-    var fileListComponent = kiwi.Vue.extend({
-        template: `
-            <div style="overflow: auto; background: #eee; height: 100%;">
-                <div v-if="!fileList.length" style="margin: 10px; font-family: arial, tahoma;">
-                    No new files have been uploaded!<br><br><br>Check back here to see the file history...
-                </div>
-                <div v-else style="margin: 10px; font-family: arial, tahoma;">
-                    Recently uploaded files...<br><br>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr><th></th><th>Nick</th><th>Link</th><th>Time</th></tr>
-                        <tr v-for="(file, idx) in fileList" :key="file" style="border-bottom: 1px solid #aaa;">
-                            <td style="border-bottom: 1px solid #aaa;">
-                                <button
-                                    :href="file.url"
-                                    @click="fileList.splice(idx,1)"
-                                    style="background: #f88; color: #822; border: none; border-radius: 5px; padding-left: 5px; padding-right: 5px; font-size: 18px; cursor: pointer;"
-                                >
-                                    <i class="fa fa-trash" aria-hidden="true"/>
-                                </button>
-                            </td>
-                            <td style="text-align: center; border-bottom: 1px solid #aaa;">
-                                {{file.nick}}
-                            </td>
-                            <td style="border-bottom: 1px solid #aaa;">
-                                <a
-                                    :href="file.url"
-                                    @click.prevent.stop="loadContent(file.url)"
-                                    style="display: inline-block; text-align: center; width: 100%; border: none; background: #8f8; border-radius: 5px; text-decoration: underline; cursor: pointer;"
-                                >
-                                    {{getFileName(file.url)}}
-                                </a>
-                            </td>
-                            <td style="text-align: center; border-bottom: 1px solid #aaa;">
-                                {{file.time}}
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
-        `,
-        data() {
-            return {
-                fileList,
-            };
-        },
-        methods: {
-            getFileName(file) {
-                let name = file.split('/')[file.split('/').length-1];
-                if (name.length >= 25) {
-                    name = name.substring(0, 18) + '...' + name.substring(name.length - 4);
-                }
-                return name;
-            },
-            loadContent(url) {
-                kiwi.emit('mediaviewer.show', url);
-            },
-        },
-    });
-
     historyButton.onclick = e => {
         kiwi.emit("sidebar.show")
-        kiwi.emit('sidebar.component', fileListComponent)
+        kiwi.showInSidebar(fileListComponent)
     }
 
     kiwi.on('message.new', e => {
