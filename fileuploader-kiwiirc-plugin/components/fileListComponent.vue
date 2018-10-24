@@ -52,9 +52,11 @@ export default {
         loadContent(url) {
             kiwi.emit('mediaviewer.show', url);
         },
-        getFileList() {
+        messageHandler() {
+            setTimeout(() => this.sharedFiles(kiwi.state.getActiveBuffer()), 1100)
+        },
+        sharedFiles(buffer) {
             this.fileList = []
-            let buffer = kiwi.state.getActiveBuffer()
             for(let i = 0; i < buffer.messagesObj.messages.length; i++) {
                 let e = buffer.messagesObj.messages[i]
                 if (e.message.indexOf(this.settings.server) !== -1) {
@@ -74,13 +76,10 @@ export default {
             kiwi.emit('files.listshared', { fileList: this.fileList, buffer })
             return this.fileList
         },
-        messageHandler() {
-            setTimeout(() => this.getFileList(), 1100)
-        },
     },
     computed: {
         currentBuffer() {
-            this.getFileList()
+            this.sharedFiles(kiwi.state.getActiveBuffer())
             return kiwi.state.getActiveBuffer().name
         },
     },
@@ -88,7 +87,7 @@ export default {
         kiwi.off('message.new', this.messageHandler)
     },
     mounted() {
-        this.getFileList()
+        this.sharedFiles(kiwi.state.getActiveBuffer())
         kiwi.on('message.new', this.messageHandler)
     }
 }
