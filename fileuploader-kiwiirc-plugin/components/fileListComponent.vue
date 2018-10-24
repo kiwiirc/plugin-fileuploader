@@ -43,6 +43,7 @@ export default {
     },
     methods: {
         getFileName(file) {
+            file = decodeURI(file);
             let name = file.split('/')[file.split('/').length-1];
             if (name.length >= 25) {
                 name = name.substring(0, 18) + '...' + name.substring(name.length - 4);
