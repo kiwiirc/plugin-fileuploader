@@ -106,15 +106,6 @@
   revision = "4eba002a5eaea69cf8d235a388fc6b65ae68d2dd"
 
 [[projects]]
-  branch = "fix-uint64-alias-custom-parser"
-  digest = "1:9c7958791541c5ac896e83a56ad15fba977ef45c7196361b5e482a9d515f69f3"
-  name = "github.com/caarlos0/env"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "299995ae5a64ca16ac0e7a879652ad46de62cbb4"
-  source = "github.com/vith/env"
-
-[[projects]]
   digest = "1:76dc72490af7174349349838f2fe118996381b31ea83243812a97e5a0fd5ed55"
   name = "github.com/dgrijalva/jwt-go"
   packages = ["."]
@@ -221,14 +212,6 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "0b12d6b5"
-
-[[projects]]
-  digest = "1:70e697d67ccaec45e16bac3a32380ebcd9e7e071079c60d0171d42cf1cf9748a"
-  name = "github.com/joho/godotenv"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "a79fa1e548e2c689c241d10173efd51e5d689d5b"
-  version = "v1.2.0"
 
 [[projects]]
   digest = "1:3e551bbb3a7c0ab2a2bf4660e7fcad16db089fdcfbb44b0199e62838038623ea"
@@ -649,10 +632,8 @@
   input-imports = [
     "github.com/BurntSushi/toml",
     "github.com/c2h5oh/datasize",
-    "github.com/caarlos0/env",
     "github.com/gin-gonic/gin",
     "github.com/go-sql-driver/mysql",
-    "github.com/joho/godotenv",
     "github.com/kiwiirc/webircgateway/pkg/webircgateway",
     "github.com/mattn/go-sqlite3",
     "github.com/rs/zerolog",
