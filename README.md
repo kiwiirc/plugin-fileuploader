@@ -34,6 +34,23 @@ $ dep ensure
 $ go build -o fileuploader *.go
 ```
 
+#### Running the server as a webircgateway plugin
+
+Add the following to the webircgateway config:
+
+```ini
+[plugins]
+plugins/fileuploader-server.go.so
+```
+
+Adjust `BasePath` and `CorsOrigins` as needed in `fileuploader.config.toml`.
+
+Create a symlink to `plugin-fileuploader/webircgateway-plugin/fileuploader-server.go` in `webircgateway/plugins/`.
+
+Run `make` in the `webircgateway/` folder to build the plugin.
+
+Start the webircgateway.
+
 #### Building the Kiwi IRC plugin
 
 The kiwi plugin is the javascript file that you link to in your kiwiirc configuration. It is the front end that provides the upload UI.
