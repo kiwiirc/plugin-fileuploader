@@ -49,24 +49,6 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
         kiwi.showInSidebar(fileListComponent)
     }
 
-    let fileList = []
-
-    kiwi.on('message.new', e => {
-        if (e.message.indexOf(settings.server) !== -1) {
-            let currentdate = new Date(); 
-            let time = currentdate.getHours() + ":"  
-                + currentdate.getMinutes() + ":" 
-                + currentdate.getSeconds();
-            let link = {
-                url: e.message.substring(e.message.indexOf(settings.server)),
-                nick: e.nick,
-                time 
-            };
-            link.url = link.url.split(' ')[0].split(')')[0]
-            fileList.push(link);
-        }
-    })
-
     const uppy = Uppy({
         autoProceed: false,
         onBeforeFileAdded: (currentFile, files) => {

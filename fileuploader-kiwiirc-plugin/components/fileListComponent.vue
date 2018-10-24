@@ -1,23 +1,15 @@
 <template>
     <div class="kiwi-filebuffer-outer-container">
         <div v-if="typeof fileList === 'undefined' || !fileList.length" class="kiwi-filebuffer-status-message">
-            No new files have been uploaded!<br><br><br>
-            Check back here to see the file history...
+            No files have recently been <br>
+            uploaded to this channel<br>
+            ({{currentBufferName}})
         </div>
         <div v-else class="kiwi-filebuffer-inner-container">
-            Recently uploaded files...<br><br>
+            <span class="kiwi-filebuffer-status-message">Files recently uploaded to:<br>{{currentBuffer}} ...</span><br><br>
             <table class="kiwi-filebuffer-table">
-                <tr><th></th><th>Nick</th><th>Link</th><th>Time</th></tr>
+                <tr><th>Nick</th><th>Link</th><th>Time</th></tr>
                 <tr v-for="(file, idx) in fileList" :key="file">
-                    <td class="kiwi-filebuffer-table-td">
-                        <button
-                            :href="file.url"
-                            @click="fileList.splice(idx,1)"
-                            class="kiwi-filebuffer-trash-button"
-                        >
-                            <i class="fa fa-trash" aria-hidden="true"/>
-                        </button>
-                    </td>
                     <td class="kiwi-filebuffer-table-td">
                         {{file.nick}}
                     </td>
@@ -46,7 +38,8 @@
 export default {
     data() {
         return {
-            fileList,
+            fileList: [],
+            settings: kiwi.state.setting('fileuploader'),
         };
     },
     methods: {
@@ -60,7 +53,44 @@ export default {
         loadContent(url) {
             kiwi.emit('mediaviewer.show', url);
         },
+        getFileList() {
+            this.fileList = []
+            let buffer = kiwi.state.getActiveBuffer()
+            let parse = (e) => {
+                if (e.message.indexOf(this.settings.server) !== -1) {
+                    let currentdate = new Date(e.time);
+                    let time = ("00" + currentdate.getHours()).slice(-2) + ":"
+                        + ("00" + currentdate.getMinutes()).slice(-2) + ":"
+                        + ("00" + currentdate.getSeconds()).slice(-2)
+                    let link = {
+                        url: e.message.substring(e.message.indexOf(this.settings.server)),
+                        nick: e.nick,
+                        time
+                    };
+                    link.url = link.url.split(' ')[0].split(')')[0]
+                    this.fileList.push(link);
+                }
+            }
+            for(let i = 0; i < buffer.messagesObj.messages.length; i++) {
+                parse(buffer.messagesObj.messages[i])
+            }
+            kiwi.emit('files.listshared', { fileList: this.fileList, buffer })
+            return this.fileList
+        }
     },
+    computed: {
+        currentBufferName() {
+            this.getFileList()
+            return kiwi.state.getActiveBuffer().name
+        }
+    },
+    destroyed() {
+        kiwi.off('message.new', () => { this.getFileList() })
+    },
+    mounted() {
+        this.getFileList()
+        kiwi.on('message.new', () => { this.getFileList() })
+    }
 }
 </script>
 
@@ -73,6 +103,7 @@ export default {
 .kiwi-filebuffer-status-message {
     margin: 10px;
     font-family: arial, tahoma;
+    font-size: 18px;
 }
 .kiwi-filebuffer-inner-container {
     margin: 10px;
@@ -85,16 +116,6 @@ export default {
 .kiwi-filebuffer-table-td {
     border-bottom: 1px solid #aaa;
     text-align: center;
-}
-.kiwi-filebuffer-trash-button {
-    background: #f88;
-    color: #822;
-    border: none;
-    border-radius: 5px;
-    padding-left: 5px;
-    padding-right: 5px;
-    font-size: 18px;
-    cursor: pointer;
 }
 .kiwi-filebuffer-anchor {
     display: inline-block;
