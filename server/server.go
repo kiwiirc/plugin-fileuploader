@@ -54,7 +54,10 @@ func signalHandler(reloadRequested, done chan struct{}) {
 }
 
 func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRouter *http.ServeMux) {
-	replaceableHandler := &ReplaceableHandler{}
+	var replaceableHandler *ReplaceableHandler
+	if parentRouter != nil {
+		replaceableHandler = &ReplaceableHandler{}
+	}
 	registeredPrefixes := make(map[string]struct{}, 0)
 
 	for {
