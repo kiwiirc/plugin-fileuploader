@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -80,6 +81,9 @@ func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRout
 			if _, ok := registeredPrefixes[routePrefix]; !ok { // this prefix not yet registered
 				registeredPrefixes[routePrefix] = struct{}{}
 				parentRouter.Handle(routePrefix, replaceableHandler)
+				if !strings.HasSuffix(routePrefix, "/") {
+					parentRouter.Handle(routePrefix+"/", replaceableHandler)
+				}
 				log.Info().
 					Str("event", "startup").
 					Str("routePrefix", routePrefix).
