@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func RunServer(router *http.ServeMux) {
+func RunServer(router *http.ServeMux, configPath string) {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	var wg sync.WaitGroup
@@ -25,7 +25,7 @@ func RunServer(router *http.ServeMux) {
 
 	// server run loop
 	wg.Add(1)
-	go runLoop(reloadRequested, done, &wg, router)
+	go runLoop(reloadRequested, done, &wg, router, configPath)
 
 	wg.Wait()
 	log.Info().
@@ -53,7 +53,7 @@ func signalHandler(reloadRequested, done chan struct{}) {
 	}
 }
 
-func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRouter *http.ServeMux) {
+func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRouter *http.ServeMux, configPath string) {
 	var replaceableHandler *ReplaceableHandler
 	if parentRouter != nil {
 		replaceableHandler = &ReplaceableHandler{}
@@ -66,7 +66,7 @@ func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRout
 		serv.cfg = *NewConfig()
 
 		// refresh config
-		err := serv.cfg.Load()
+		err := serv.cfg.Load(configPath)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to load config")
 		}

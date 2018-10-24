@@ -50,19 +50,20 @@ func NewConfig() *Config {
 	_, err := toml.Decode(defaultConfig, cfg)
 	if err != nil {
 		log.Fatal().Err(err).
-			Msg("failed to decode defaultConfig")
+			Msg("Failed to decode defaultConfig")
 	}
 	return cfg
 }
 
-func (cfg *Config) Load() error {
-	_, err := toml.DecodeFile("fileuploader.config.toml", cfg)
+func (cfg *Config) Load(configPath string) error {
+	log.Info().Str("path", configPath).Msg("Loading config file")
+	_, configLoadErr := toml.DecodeFile(configPath, cfg)
 
 	// set log level as early as possible so it affects early logging
 	zerolog.SetGlobalLevel(cfg.Logging.Level.Level)
 
-	if err != nil {
-		log.Error().Err(err).Msg("failed to parse config")
+	if configLoadErr != nil {
+		log.Error().Err(configLoadErr).Msg("Failed to parse config")
 	}
 
 	// just debug logging
@@ -83,7 +84,7 @@ func (cfg *Config) Load() error {
 			Str("address", sink.Address).
 			Str("format", sink.Format.string).
 			Str("level", sink.LogLevel.String()).
-			Msg("sending logs to")
+			Msg("Sending logs to")
 		conn, err := net.Dial(sink.Protocol, sink.Address)
 		level := sink.LogLevel.Level
 		if err != nil {
@@ -110,9 +111,9 @@ func (cfg *Config) Load() error {
 			// SelectiveLevelWriters can filter them down
 			zerolog.SetGlobalLevel(logging.MaxLevel(cfg.Logging.Level.Level, level))
 		}
+		return err
 	}
-
-	return err
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////

@@ -16,6 +16,6 @@ func Start(gateway *webircgateway.Gateway, pluginsQuit *sync.WaitGroup) {
 
 	go func() {
 		defer pluginsQuit.Done()
-		server.RunServer(gateway.HttpRouter)
+		server.RunServer(gateway.HttpRouter, "fileuploader.config.toml")
 	}()
 }
