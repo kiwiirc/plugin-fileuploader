@@ -55,6 +55,13 @@ export default {
         messageHandler() {
             setTimeout(() => this.sharedFiles(kiwi.state.getActiveBuffer()), 1100)
         },
+        pruneDups(a) {
+            for(let i = 0; i < a.length; ++i) {
+                for(let j = i + 1; j < a.length; ++j) {
+                    if(a[i].url === a[j].url) a.splice(j, 1)
+                }
+            }
+        },
         sharedFiles(buffer) {
             this.fileList = []
             for(let i = 0; i < buffer.messagesObj.messages.length; i++) {
@@ -73,6 +80,8 @@ export default {
                     this.fileList.push(link);
                 }
             }
+            // comment out the following line to include duplicates
+            this.pruneDups(this.fileList)
             kiwi.emit('files.listshared', { fileList: this.fileList, buffer })
             return this.fileList
         },
