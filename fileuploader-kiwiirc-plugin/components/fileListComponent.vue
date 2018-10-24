@@ -3,10 +3,10 @@
         <div v-if="typeof fileList === 'undefined' || !fileList.length" class="kiwi-filebuffer-status-message">
             No files have recently been <br>
             uploaded to this channel<br>
-            ({{currentBufferName}})
+            {{currentBuffer}}
         </div>
         <div v-else class="kiwi-filebuffer-inner-container">
-            <span class="kiwi-filebuffer-status-message">Files recently uploaded to:<br>{{currentBuffer}} ...</span><br><br>
+            <span class="kiwi-filebuffer-status-message">Files recently uploaded to: {{currentBuffer}}</span><br><br>
             <table class="kiwi-filebuffer-table">
                 <tr><th>Nick</th><th>Link</th><th>Time</th></tr>
                 <tr v-for="(file, idx) in fileList" :key="file">
@@ -79,10 +79,10 @@ export default {
         }
     },
     computed: {
-        currentBufferName() {
+        currentBuffer() {
             this.getFileList()
             return kiwi.state.getActiveBuffer().name
-        }
+        },
     },
     destroyed() {
         kiwi.off('message.new', () => { this.getFileList() })
