@@ -2,124 +2,103 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"os"
-	"reflect"
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/c2h5oh/datasize"
-	"github.com/caarlos0/env"
-	"github.com/joho/godotenv"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
-
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
-type RemoteLogSink struct {
-	Addr   net.Addr
-	Format string
-	Level  zerolog.Level
+type Config struct {
+	Server struct {
+		ListenAddress             string
+		BasePath                  string
+		CorsOrigins               []string
+		TrustedReverseProxyRanges []ipnet
+	}
+	Storage struct {
+		Path              string
+		ShardLayers       int
+		MaximumUploadSize datasize.ByteSize
+	}
+	Database struct {
+		Type string
+		Path string
+	}
+	Expiration struct {
+		MaxAge        duration
+		CheckInterval duration
+	}
+	Logging struct {
+		Level      loglevel
+		RemoteSink *struct {
+			LogLevel loglevel
+			Format   format
+			Protocol string
+			Address  string
+		}
+	}
 }
 
-// UploadServerConfig contains settings that control the behavior of the UploadServer
-type UploadServerConfig struct {
-	ListenAddr string `env:"LISTEN_ADDR" envDefault:"127.0.0.1:8088"`
-
-	// the externally reachable URL. this can differ from the listen address
-	// when using a reverse proxy. can be relative ("/files") or absolute
-	// ("https://example.com/files")
-	BasePath string `env:"BASE_PATH" envDefault:"/files"`
-
-	// comma separated list of CORS Origins to allow
-	CorsOrigins []string `env:"CORS_ORIGINS" envSeparator:","`
-
-	StoragePath             string            `env:"STORAGE_PATH"              envDefault:"./uploads"`
-	StorageShardLayers      int               `env:"STORAGE_SHARD_LAYERS"      envDefault:"6"`
-	DBType                  string            `env:"DATABASE_TYPE"             envDefault:"sqlite3"`
-	DBPath                  string            `env:"DATABASE_PATH"             envDefault:"./uploads.db"`
-	MaximumUploadSize       datasize.ByteSize `env:"MAXIMUM_UPLOAD_SIZE"       envDefault:"10 MB"`
-	ExpirationAge           time.Duration     `env:"EXPIRATION_AGE"            envDefault:"168h"` // 1 week
-	ExpirationCheckInterval time.Duration     `env:"EXPIRATION_CHECK_INTERVAL" envDefault:"5m"`
-
-	// set global loglevel
-	LogLevel zerolog.Level `env:"LOG_LEVEL" envDefault:"info"`
-
-	// network address to send logs to
-	//
-	// format: <log-level>:<network-type>:<log-format>:<address/path>
-	//
-	// log level: debug, info, warn, error, fatal, panic
-	// supported network types: udp, unix
-	// supported log formats: json
-	// examples:
-	//   debug:unix:json:/run/fileuploader-log.sock
-	//   info:udp:json:10.33.0.2:3333
-	RemoteLogSink *RemoteLogSink `env:"REMOTE_LOG_SINK"`
-
-	TrustedReverseProxyRanges []*net.IPNet `env:"TRUSTED_REVERSE_PROXY_RANGES" envDefault:"10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7,127.0.0.0/8,::1/128"`
+func NewConfig() *Config {
+	cfg := &Config{}
+	_, err := toml.Decode(defaultConfig, cfg)
+	if err != nil {
+		log.Fatal().Err(err).
+			Msg("Failed to decode defaultConfig")
+	}
+	return cfg
 }
 
-// LoadFromEnv populates the config from the process environment and .env file
-func (cfg *UploadServerConfig) LoadFromEnv() {
-	// load values from .env file
-	err := godotenv.Overload()
-	if err != nil {
-		if _, ok := err.(*os.PathError); ok {
-			log.Debug().Msg("No .env file loaded")
-		} else {
-			log.Fatal().Err(err).Msg("failed to load .env")
+func (cfg *Config) Load(configPath string) error {
+	log.Info().Str("path", configPath).Msg("Loading config file")
+	_, configLoadErr := toml.DecodeFile(configPath, cfg)
+
+	// set log level as early as possible so it affects early logging
+	zerolog.SetGlobalLevel(cfg.Logging.Level.Level)
+
+	if configLoadErr != nil {
+		log.Error().Err(configLoadErr).Msg("Failed to parse config")
+	}
+
+	// just debug logging
+	if len(cfg.Server.TrustedReverseProxyRanges) > 0 {
+		ranges := []string{}
+		for _, rang := range cfg.Server.TrustedReverseProxyRanges {
+			ranges = append(ranges, rang.String())
 		}
-	} else {
-		log.Debug().Msg(".env file loaded")
-	}
-
-	// populate config struct
-	err = env.ParseWithFuncs(cfg, env.CustomParsers{
-		reflect.TypeOf(zerolog.DebugLevel): logLevelParser,
-		reflect.TypeOf(datasize.B):         byteSizeParser,
-		reflect.TypeOf([]*net.IPNet{}):     ipNetSliceParser,
-		// reflect.TypeOf((*net.Addr)(nil)):   netAddrParser,
-		reflect.TypeOf(&RemoteLogSink{}): remoteLogSinkParser,
-	})
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to parse config")
-	}
-
-	if len(cfg.TrustedReverseProxyRanges) > 0 {
-		var trustedCidrs []string
-		for _, cidr := range cfg.TrustedReverseProxyRanges {
-			trustedCidrs = append(trustedCidrs, cidr.String())
-		}
-		log.Debug().Strs("trustedCidrs", trustedCidrs).Msg("Trusting reverse proxies")
-	}
-
-	zerolog.SetGlobalLevel(cfg.LogLevel)
-
-	if cfg.RemoteLogSink != nil {
-		network := cfg.RemoteLogSink.Addr.Network()
-		address := cfg.RemoteLogSink.Addr.String()
 		log.Debug().
-			Str("network", network).
-			Str("address", address).
-			Str("format", cfg.RemoteLogSink.Format).
-			Msg("sending logs to")
-		conn, err := net.Dial(network, address)
-		level := cfg.RemoteLogSink.Level
+			Strs("trustedCidrs", ranges).
+			Msg("Trusting reverse proxies")
+	}
+
+	// dial the remote sinks and configure logger to output to them
+	if sink := cfg.Logging.RemoteSink; sink != nil {
+		log.Debug().
+			Str("protocol", sink.Protocol).
+			Str("address", sink.Address).
+			Str("format", sink.Format.string).
+			Str("level", sink.LogLevel.String()).
+			Msg("Sending logs to")
+		conn, err := net.Dial(sink.Protocol, sink.Address)
+		level := sink.LogLevel.Level
 		if err != nil {
 			log.Error().
 				Err(err).
-				Str("network", network).
-				Str("address", address).
+				Str("protocol", sink.Protocol).
+				Str("address", sink.Address).
 				Msg("Failed to dial network log sink")
 		} else {
 			log.Logger = log.Output(
 				zerolog.MultiLevelWriter(
 					logging.SelectiveLevelWriter{
 						zerolog.ConsoleWriter{Out: os.Stderr},
-						cfg.LogLevel,
+						cfg.Logging.Level.Level,
 					},
 					logging.SelectiveLevelWriter{
 						conn,
@@ -127,86 +106,69 @@ func (cfg *UploadServerConfig) LoadFromEnv() {
 					},
 				),
 			)
-			zerolog.SetGlobalLevel(logging.MaxLevel(cfg.LogLevel, level))
+
+			// events must pass through the global log level before our
+			// SelectiveLevelWriters can filter them down
+			zerolog.SetGlobalLevel(logging.MaxLevel(cfg.Logging.Level.Level, level))
 		}
+		return err
 	}
+	return nil
 }
 
-func logLevelParser(v string) (interface{}, error) {
-	levelStr := strings.ToLower(v)
-	return zerolog.ParseLevel(levelStr)
+////////////////////////////////////////////////////////////////
+//     private types implementing encoding.TextUnmarshaler    //
+////////////////////////////////////////////////////////////////
+
+type loglevel struct {
+	zerolog.Level
 }
 
-func byteSizeParser(v string) (interface{}, error) {
-	var bytes datasize.ByteSize
-	err := bytes.UnmarshalText([]byte(v))
-	if err != nil {
-		log.Error().Err(err).Str("stringValue", v).Msg("failed to parse byteSize")
-		return nil, err
-	}
-	return bytes, nil
-}
-
-func ipNetSliceParser(v string) (interface{}, error) {
-	cidrStrings := strings.Split(v, ",")
-	var cidrs []*net.IPNet
-	for _, cidrString := range cidrStrings {
-		_, cidr, err := net.ParseCIDR(cidrString)
-		if err != nil {
-			log.Error().Err(err).Str("cidrString", cidrString).Msg("failed to parse CIDR")
-			return nil, err
-		}
-		cidrs = append(cidrs, cidr)
-	}
-	return cidrs, nil
-}
-
-func remoteLogSinkParser(v string) (interface{}, error) {
-	parts := strings.SplitN(v, ":", 4)
-	if len(parts) != 4 {
-		return nil, errors.New("Required format <log-level>:<network-type>:<log-format>:<address/path> not matched")
-	}
-
-	sink := &RemoteLogSink{}
-
-	levelStr := parts[0]
-	network := parts[1]
-	format := parts[2]
-	address := parts[3]
-
+func (l *loglevel) UnmarshalText(text []byte) error {
+	levelStr := strings.ToLower(string(text))
 	level, err := zerolog.ParseLevel(levelStr)
-	if err != nil {
-		return nil, fmt.Errorf("Unknown Level String: '%s'", levelStr)
-	}
-	sink.Level = level
+	l.Level = level
+	return err
+}
 
-	switch format {
+////////////////////////////////////////////////////////////////
+
+type ipnet struct {
+	net.IPNet
+}
+
+func (i *ipnet) UnmarshalText(text []byte) error {
+	_, cidr, err := net.ParseCIDR(string(text))
+	i.IPNet = *cidr
+	return err
+}
+
+////////////////////////////////////////////////////////////////
+
+type duration struct {
+	time.Duration
+}
+
+func (d *duration) UnmarshalText(text []byte) error {
+	dur, err := time.ParseDuration(string(text))
+	d.Duration = dur
+	return err
+}
+
+////////////////////////////////////////////////////////////////
+
+type format struct {
+	string
+}
+
+func (f *format) UnmarshalText(text []byte) error {
+	formatStr := string(text)
+	switch formatStr {
 	case "json":
-		sink.Format = format
+		f.string = formatStr
 		break
 	default:
-		return nil, errors.New("Unsupported log serialization format: " + format)
+		return errors.New("Unsupported log serialization format: " + formatStr)
 	}
-
-	unixAddr, err := net.ResolveUnixAddr(network, address)
-	if err == nil {
-		sink.Addr = unixAddr
-		return sink, nil
-	}
-	_, ok := err.(net.UnknownNetworkError)
-	if !ok {
-		return nil, err
-	}
-
-	udpAddr, err := net.ResolveUDPAddr(network, address)
-	if err == nil {
-		sink.Addr = udpAddr
-		return sink, nil
-	}
-	_, ok = err.(net.UnknownNetworkError)
-	if !ok {
-		return nil, err
-	}
-
-	return nil, errors.New("Unhandled network type: " + network)
+	return nil
 }

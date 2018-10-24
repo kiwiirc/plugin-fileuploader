@@ -1,9 +1,13 @@
 package main
 
 import (
+	"flag"
+
 	"github.com/kiwiirc/plugin-fileuploader/server"
 )
 
 func main() {
-	server.RunServer(nil)
+	var configPath = flag.String("config", "fileuploader.config.toml", "path to config file")
+	flag.Parse()
+	server.RunServer(nil, *configPath)
 }
