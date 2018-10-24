@@ -1,6 +1,6 @@
 import { Core as Uppy, Dashboard, Tus, Webcam } from 'uppy'
 import 'uppy/dist/uppy.min.css'
-import fileListComponent from './components/fileListComponent.vue'
+import sidebarFileList from './components/SidebarFileList.vue'
 
 const KiB = 2 ** 10
 const MiB = 2 ** 20
@@ -46,7 +46,7 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 
     historyButton.onclick = e => {
         kiwi.emit("sidebar.show")
-        kiwi.showInSidebar(fileListComponent)
+        kiwi.showInSidebar(sidebarFileList)
     }
 
     const uppy = Uppy({

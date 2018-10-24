@@ -37,7 +37,6 @@
 export default {
     data() {
         return {
-            fileList: [],
             settings: kiwi.state.setting('fileuploader'),
         };
     },
@@ -59,6 +58,7 @@ export default {
         sharedFiles(buffer) {
             let returnArr = []
             let messages = buffer.getMessages()
+            let tmp = buffer.message_count
             for(let i = 0; i < messages.length; i++) {
                 let e = messages[i]
                 if (e.message.indexOf(this.settings.server) !== -1) {
@@ -89,7 +89,6 @@ export default {
             return kiwi.state.getActiveBuffer().name
         },
         fileList() {
-            console.log('updating')
             return this.sharedFiles(kiwi.state.getActiveBuffer()) 
         }
     },
