@@ -1,7 +1,6 @@
 /vendor/
 /uploads/
 /uploads.db
-/.env
 /fileuploader.config.toml
 
 # build artifacts
