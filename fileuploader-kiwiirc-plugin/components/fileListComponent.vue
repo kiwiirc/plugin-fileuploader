@@ -2,11 +2,10 @@
     <div class="kiwi-filebuffer-outer-container">
         <div v-if="typeof fileList === 'undefined' || !fileList.length" class="kiwi-filebuffer-status-message">
             No files have recently been <br>
-            uploaded to this channel<br>
-            {{currentBuffer}}
+            uploaded to this channel {{currentBuffer}}
         </div>
         <div v-else class="kiwi-filebuffer-inner-container">
-            <span class="kiwi-filebuffer-status-message">Files recently uploaded to: {{currentBuffer}}</span><br><br>
+            <span class="kiwi-filebuffer-status-message">Files recently uploaded to {{currentBuffer}}</span><br><br>
             <table class="kiwi-filebuffer-table">
                 <tr><th>Nick</th><th>Link</th><th>Time</th></tr>
                 <tr v-for="(file, idx) in fileList" :key="file">
@@ -56,7 +55,8 @@ export default {
         getFileList() {
             this.fileList = []
             let buffer = kiwi.state.getActiveBuffer()
-            let parse = (e) => {
+            for(let i = 0; i < buffer.messagesObj.messages.length; i++) {
+                let e = buffer.messagesObj.messages[i]
                 if (e.message.indexOf(this.settings.server) !== -1) {
                     let currentdate = new Date(e.time);
                     let time = ("00" + currentdate.getHours()).slice(-2) + ":"
@@ -71,12 +71,12 @@ export default {
                     this.fileList.push(link);
                 }
             }
-            for(let i = 0; i < buffer.messagesObj.messages.length; i++) {
-                parse(buffer.messagesObj.messages[i])
-            }
             kiwi.emit('files.listshared', { fileList: this.fileList, buffer })
             return this.fileList
-        }
+        },
+        messageHandler() {
+            setTimeout(() => this.getFileList(), 1100)
+        },
     },
     computed: {
         currentBuffer() {
@@ -85,11 +85,11 @@ export default {
         },
     },
     destroyed() {
-        kiwi.off('message.new', () => { this.getFileList() })
+        kiwi.off('message.new', this.messageHandler)
     },
     mounted() {
         this.getFileList()
-        kiwi.on('message.new', () => { this.getFileList() })
+        kiwi.on('message.new', this.messageHandler)
     }
 }
 </script>
@@ -122,8 +122,10 @@ export default {
     text-align: center;
     width: 100%;
     border: none;
-    background: #8f8;
-     border-radius: 5px;
+    background: #afa;
+    color: #006;
+    line-height: 1.1em;
+    border-radius: 5px;
     text-decoration: underline;
     cursor: pointer;
 }
