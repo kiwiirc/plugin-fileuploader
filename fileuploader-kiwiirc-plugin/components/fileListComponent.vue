@@ -1,6 +1,6 @@
 <template>
     <div class="kiwi-filebuffer-outer-container">
-        <div v-if="typeof fileList === 'undefined' || !fileList.length" class="kiwi-filebuffer-status-message">
+        <div v-if="!fileList.length" class="kiwi-filebuffer-status-message">
             No files have recently been <br>
             uploaded to this channel {{currentBuffer}}
         </div>
@@ -56,17 +56,11 @@ export default {
         messageHandler() {
             setTimeout(() => this.sharedFiles(kiwi.state.getActiveBuffer()), 1100)
         },
-        pruneDups(a) {
-            for(let i = 0; i < a.length; ++i) {
-                for(let j = i + 1; j < a.length; ++j) {
-                    if(a[i].url === a[j].url) a.splice(j, 1)
-                }
-            }
-        },
         sharedFiles(buffer) {
-            this.fileList = []
-            for(let i = 0; i < buffer.messagesObj.messages.length; i++) {
-                let e = buffer.messagesObj.messages[i]
+            let returnArr = []
+            let messages = buffer.getMessages()
+            for(let i = 0; i < messages.length; i++) {
+                let e = messages[i]
                 if (e.message.indexOf(this.settings.server) !== -1) {
                     let currentdate = new Date(e.time);
                     let time = ("00" + currentdate.getHours()).slice(-2) + ":"
@@ -78,13 +72,15 @@ export default {
                         time
                     };
                     link.url = link.url.split(' ')[0].split(')')[0]
-                    this.fileList.push(link);
+                    returnArr.push(link);
                 }
             }
+
             // comment out the following line to include duplicates
-            this.pruneDups(this.fileList)
-            kiwi.emit('files.listshared', { fileList: this.fileList, buffer })
-            return this.fileList
+            returnArr = _.uniqBy(returnArr, 'url')
+
+            kiwi.emit('files.listshared', { fileList: returnArr, buffer })
+            return returnArr
         },
     },
     computed: {
@@ -92,6 +88,10 @@ export default {
             this.sharedFiles(kiwi.state.getActiveBuffer())
             return kiwi.state.getActiveBuffer().name
         },
+        fileList() {
+            console.log('updating')
+            return this.sharedFiles(kiwi.state.getActiveBuffer()) 
+        }
     },
     destroyed() {
         kiwi.off('message.new', this.messageHandler)
