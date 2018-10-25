@@ -21,7 +21,7 @@
                             {{getFileName(file.url)}}
                         </a>
                     </td>
-                    <td class="kiwi-filebuffer-table-td">
+                    <td class="kiwi-filebuffer-table-td kiwi-filebuffer-time">
                         {{file.time}}
                     </td>
                 </tr>
@@ -62,10 +62,7 @@ export default {
             for(let i = 0; i < messages.length; i++) {
                 let e = messages[i]
                 if (e.message.indexOf(this.settings.server) !== -1) {
-                    let currentdate = new Date(e.time);
-                    let time = ("00" + currentdate.getHours()).slice(-2) + ":"
-                        + ("00" + currentdate.getMinutes()).slice(-2) + ":"
-                        + ("00" + currentdate.getSeconds()).slice(-2)
+                    let time = new Intl.DateTimeFormat('default', { hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(new Date(e.time))
                     let link = {
                         url: e.message.substring(e.message.indexOf(this.settings.server)),
                         nick: e.nick,
@@ -109,12 +106,12 @@ export default {
     height: 100%;
 }
 .kiwi-filebuffer-status-message {
-    margin: 10px;
+    margin: 20px;
     font-family: arial, tahoma;
     font-size: 18px;
 }
 .kiwi-filebuffer-inner-container {
-    margin: 10px;
+    margin: 5px;
     font-family: arial, tahoma;
 }
 .kiwi-filebuffer-table {
@@ -136,5 +133,8 @@ export default {
     border-radius: 5px;
     text-decoration: underline;
     cursor: pointer;
+}
+.kiwi-filebuffer-time {
+    font-size: 0.95em;
 }
 </style>
