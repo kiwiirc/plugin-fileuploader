@@ -67,7 +67,7 @@ export default {
                         fileName: this.getFileName(url),
                         time
                     };
-                    link.url = link.url.split(' ')[0].split(')')[0]
+                    link.url = link.url.split(' ')[0].split(')')[0].split('\'')[0]
                     returnArr.push(link);
                 }
             }
