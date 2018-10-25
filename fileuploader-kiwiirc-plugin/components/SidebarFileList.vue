@@ -18,7 +18,7 @@
                             @click.prevent.stop="loadContent(file.url)"
                             class="kiwi-filebuffer-anchor"
                         >
-                            {{getFileName(file.url)}}
+                            {{file.fileName}}
                         </a>
                     </td>
                     <td class="kiwi-filebuffer-table-td kiwi-filebuffer-time">
@@ -52,9 +52,6 @@ export default {
         loadContent(url) {
             kiwi.emit('mediaviewer.show', url);
         },
-        messageHandler() {
-            setTimeout(() => this.sharedFiles(kiwi.state.getActiveBuffer()), 1100)
-        },
         sharedFiles(buffer) {
             let returnArr = []
             let messages = buffer.getMessages()
@@ -63,9 +60,11 @@ export default {
                 let e = messages[i]
                 if (e.message.indexOf(this.settings.server) !== -1) {
                     let time = new Intl.DateTimeFormat('default', { hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(new Date(e.time))
+                    let url = e.message.substring(e.message.indexOf(this.settings.server))
                     let link = {
-                        url: e.message.substring(e.message.indexOf(this.settings.server)),
+                        url,
                         nick: e.nick,
+                        fileName: this.getFileName(url),
                         time
                     };
                     link.url = link.url.split(' ')[0].split(')')[0]
@@ -82,20 +81,12 @@ export default {
     },
     computed: {
         currentBuffer() {
-            this.sharedFiles(kiwi.state.getActiveBuffer())
             return kiwi.state.getActiveBuffer().name
         },
         fileList() {
             return this.sharedFiles(kiwi.state.getActiveBuffer()) 
         }
     },
-    destroyed() {
-        kiwi.off('message.new', this.messageHandler)
-    },
-    mounted() {
-        this.sharedFiles(kiwi.state.getActiveBuffer())
-        kiwi.on('message.new', this.messageHandler)
-    }
 }
 </script>
 
