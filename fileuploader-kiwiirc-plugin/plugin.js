@@ -39,15 +39,19 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
     kiwi.addUi('input', uploadFileButton)
 
     // add button to input bar
-    const historyButton = document.createElement('i')
-    historyButton.className = 'history-button fa fa-history'
+    //const historyButton = document.createElement('i')
+    //historyButton.className = 'history-button fa fa-history'
 
-    kiwi.addUi('input', historyButton)
+    // kiwi.addUi('input', historyButton)
 
-    historyButton.onclick = e => {
-        kiwi.emit("sidebar.show")
-        kiwi.showInSidebar(sidebarFileList)
-    }
+    //historyButton.onclick = e => {
+    //    kiwi.emit("sidebar.show")
+    //    kiwi.showInSidebar(sidebarFileList)
+    //}
+
+    let c = new kiwi.Vue(sidebarFileList)
+    c.$mount()
+    kiwi.addUi('about_buffer', c.$el, {title: 'Shared Files'})
 
     const uppy = Uppy({
         autoProceed: false,
