@@ -1,20 +1,29 @@
 <template>
     <div class="kiwi-filebuffer-outer-container">
-        <div v-if="!fileList.length">
+        <div v-if="!fileList.length" class="kiwi-filebuffer-status-message">
             No files have recently been uploaded...
         </div>
         <div v-else class="kiwi-filebuffer-inner-container">
-            <div v-for="(file, idx) in fileList" :key="file" class="kiwi-filebuffer-download-container">
-                <a
-                    :href="file.url"
-                    @click.prevent.stop="loadContent(file.url)"
-                    class="kiwi-filebuffer-anchor"
-                >
-                    <i class="fa fa-download" style="float: right; font-size: 40px;"/>
-                    <div style="font-size: 18px;">{{ file.fileName }}</div>
-                    <div style="font-size: 12px;"> {{ file.nick }} &nbsp;&nbsp;&nbsp; {{ file.time }}</div>
-                </a>
-            </div>
+            <table class="kiwi-filebuffer-table">
+                <tr><th>Nick</th><th>Link</th><th>Time</th></tr>
+                <tr v-for="(file, idx) in fileList" :key="file">
+                    <td class="kiwi-filebuffer-table-td">
+                        {{file.nick}}
+                    </td>
+                    <td class="kiwi-filebuffer-table-td">
+                        <a
+                            :href="file.url"
+                            @click.prevent.stop="loadContent(file.url)"
+                            class="kiwi-filebuffer-anchor"
+                        >
+                            {{file.fileName}}
+                        </a>
+                    </td>
+                    <td class="kiwi-filebuffer-table-td kiwi-filebuffer-time">
+                        {{file.time}}
+                    </td>
+                </tr>
+            </table>
         </div>
     </div>
 </template>
@@ -33,8 +42,8 @@ export default {
         getFileName(file) {
             file = decodeURI(file);
             let name = file.split('/')[file.split('/').length-1];
-            if (name.length >= 20) {
-                name = name.substring(0, 13) + '...' + name.substring(name.length - 4);
+            if (name.length >= 25) {
+                name = name.substring(0, 18) + '...' + name.substring(name.length - 4);
             }
             return name;
         },
@@ -80,25 +89,39 @@ export default {
 <style scoped>
 .kiwi-filebuffer-outer-container {
     overflow: auto;
+    background: #eee;
     height: 100%;
-    width: 100%;
+}
+.kiwi-filebuffer-status-message {
+    margin: 20px;
+    font-family: arial, tahoma;
+    font-size: 18px;
 }
 .kiwi-filebuffer-inner-container {
+    margin: 5px;
     font-family: arial, tahoma;
-    width: 100%;
 }
-.kiwi-filebuffer-download-container {
-    margin: 10px;
-    border-radius: 5px;
-    padding: 5px;
-    padding-bottom: 0;
-    background: #666;
-    color: #eee;
+.kiwi-filebuffer-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.kiwi-filebuffer-table-td {
+    border-bottom: 1px solid #aaa;
+    text-align: center;
 }
 .kiwi-filebuffer-anchor {
+    display: inline-block;
+    text-align: center;
+    width: 100%;
     border: none;
-    color: #eee;
+    background: #afa;
+    color: #006;
+    line-height: 1.1em;
+    border-radius: 5px;
+    text-decoration: underline;
     cursor: pointer;
-    text-decoration: none;
+}
+.kiwi-filebuffer-time {
+    font-size: 0.95em;
 }
 </style>
