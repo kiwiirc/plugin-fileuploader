@@ -2,8 +2,11 @@
 import 'core-js/fn/array/iterator'
 // import 'core-js/fn/promise' // already included by kiwiirc
 
-import { Core as Uppy, Dashboard, Tus, Webcam } from 'uppy'
-import 'uppy/dist/uppy.min.css'
+import Uppy from '@uppy/core'
+import Dashboard from '@uppy/dashboard'
+import Tus from '@uppy/tus'
+import Webcam from '@uppy/webcam'
+import '@uppy/dashboard/dist/style.min.css'
 
 const KiB = 2 ** 10
 const MiB = 2 ** 20
