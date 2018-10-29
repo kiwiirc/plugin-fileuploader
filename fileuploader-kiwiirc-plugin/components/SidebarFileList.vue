@@ -10,9 +10,9 @@
                     @click.prevent.stop="loadContent(file.url)"
                     class="kiwi-filebuffer-anchor"
                 >
-                    <i class="fa fa-download" style="float: right; font-size: 40px;"/>
+                    <i class="fa fa-download" style="float: right; font-size: 40px; margin-top:4px; margin-right: 3px;"/>
                     <div style="font-size: 18px;">{{ file.fileName }}</div>
-                    <div style="font-size: 12px;"> {{ file.nick }} &nbsp;&nbsp;&nbsp; {{ file.time }}</div>
+                    <div style="font-size: 11px;"> {{ file.nick }} &nbsp;&nbsp; {{ file.time }}</div>
                 </a>
             </div>
         </div>
@@ -38,6 +38,12 @@ export default {
             }
             return name;
         },
+        truncateNick(nick) {
+            if (nick.length >= 10) {
+                nick = nick.substring(0, 8) + "\u2026";
+            }
+            return nick;
+        },
         loadContent(url) {
             kiwi.emit('mediaviewer.show', url);
         },
@@ -50,14 +56,13 @@ export default {
                 let e = messages[i]
                 if (e.message.indexOf(this.settings.server) !== -1) {
                     let time = new Intl.DateTimeFormat('default', { hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(new Date(e.time))
-                    let url = e.message.substring(e.message.indexOf(this.settings.server))
+                    let url = e.message.substring(e.message.indexOf(this.settings.server)).split(' ')[0].split(')')[0].split('\'')[0]
                     let link = {
                         url,
-                        nick: e.nick,
+                        nick: this.truncateNick(e.nick),
                         fileName: this.getFileName(url),
                         time
                     };
-                    link.url = link.url.split(' ')[0].split(')')[0].split('\'')[0]
                     returnArr.push(link);
                 }
             }
