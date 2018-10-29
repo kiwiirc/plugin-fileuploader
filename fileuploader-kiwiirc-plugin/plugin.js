@@ -1,3 +1,7 @@
+// polyfill globals for uppy on IE11
+import 'core-js/fn/array/iterator'
+// import 'core-js/fn/promise' // already included by kiwiirc
+
 import { Core as Uppy, Dashboard, Tus, Webcam } from 'uppy'
 import 'uppy/dist/uppy.min.css'
 
@@ -69,7 +73,11 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
     // show uppy modal whenever a file is dragged over the page
     window.addEventListener('dragenter', event => {
         // swallow error and ignore drag if no valid buffer to share to
-        try { getValidUploadTarget() } catch (err) { return }
+        try {
+            getValidUploadTarget()
+        } catch (err) {
+            return
+        }
 
         dashboard.openModal()
     })
@@ -77,7 +85,11 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
     // show uppy modal when files are pasted
     kiwi.on('buffer.paste', event => {
         // swallow error and ignore paste if no valid buffer to share to
-        try { getValidUploadTarget() } catch (err) { return }
+        try {
+            getValidUploadTarget()
+        } catch (err) {
+            return
+        }
 
         // IE 11 puts the clipboardData on the window
         const cbData = event.clipboardData || window.clipboardData
@@ -90,9 +102,11 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
         const text = cbData.getData('text')
         if (text) {
             const network = kiwi.state.getActiveNetwork()
-            const networkMaxLineLen = network.ircClient.options.message_max_length
+            const networkMaxLineLen =
+                network.ircClient.options.message_max_length
             if (text.length > networkMaxLineLen || numLines(text) > 4) {
-                const msg = 'You pasted a lot of text.\nWould you like to upload as a file instead?'
+                const msg =
+                    'You pasted a lot of text.\nWould you like to upload as a file instead?'
                 if (window.confirm(msg)) {
                     // stop IrcInput from ingesting the pasted text
                     event.preventDefault()
