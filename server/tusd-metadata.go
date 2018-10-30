@@ -23,7 +23,7 @@ SOFTWARE.
 // parseMeta and serializeMeta unexported functions extracted from
 // from https://github.com/tus/tusd/blob/0.10.0/unrouted_handler.go#L835-L879
 
-package main
+package server
 
 import (
 	"encoding/base64"

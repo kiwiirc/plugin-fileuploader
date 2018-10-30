@@ -1,14 +1,12 @@
-package main
+package server
 
 import (
 	"net/http"
 	"sync"
 
-	"github.com/kiwiirc/plugin-fileuploader/db"
-
-	"github.com/kiwiirc/plugin-fileuploader/events"
-
 	"github.com/gin-gonic/gin"
+	"github.com/kiwiirc/plugin-fileuploader/db"
+	"github.com/kiwiirc/plugin-fileuploader/events"
 	"github.com/kiwiirc/plugin-fileuploader/expirer"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
@@ -17,10 +15,10 @@ import (
 // UploadServer is a simple configurable service for file sharing.
 // Compatible with TUS upload clients.
 type UploadServer struct {
-	cfg                 UploadServerConfig
+	cfg                 Config
 	DBConn              *db.DatabaseConnection
 	store               *shardedfilestore.ShardedFileStore
-	router              *gin.Engine
+	Router              *gin.Engine
 	expirer             *expirer.Expirer
 	httpServer          *http.Server
 	startedMu           sync.Mutex
@@ -45,39 +43,46 @@ func init() {
 }
 
 // Run starts the UploadServer
-func (serv *UploadServer) Run() error {
-	serv.router = gin.New()
-	serv.router.Use(logging.GinLogger(), gin.Recovery())
+func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
+	serv.Router = gin.New()
+	serv.Router.Use(logging.GinLogger(), gin.Recovery())
 
 	serv.DBConn = db.ConnectToDB(db.DBConfig{
-		DriverName: serv.cfg.DBType,
-		DSN:        serv.cfg.DBPath,
+		DriverName: serv.cfg.Database.Type,
+		DSN:        serv.cfg.Database.Path,
 	})
 
 	serv.store = shardedfilestore.New(
-		serv.cfg.StoragePath,
-		serv.cfg.StorageShardLayers,
+		serv.cfg.Storage.Path,
+		serv.cfg.Storage.ShardLayers,
 		serv.DBConn,
 	)
 
 	serv.expirer = expirer.New(
 		serv.store,
-		serv.cfg.ExpirationAge,
-		serv.cfg.ExpirationCheckInterval,
+		serv.cfg.Expiration.MaxAge.Duration,
+		serv.cfg.Expiration.CheckInterval.Duration,
 	)
 
-	err := serv.registerTusHandlers(serv.router, serv.store)
+	err := serv.registerTusHandlers(serv.Router, serv.store)
 	if err != nil {
 		return err
 	}
 
-	serv.httpServer = &http.Server{
-		Addr:    serv.cfg.ListenAddr,
-		Handler: serv.router,
-	}
-
 	// closed channel indicates that startup is complete
 	close(serv.GetStartedChan())
+
+	if replaceableHandler != nil {
+		// set ReplaceableHandler that's mounted in an external server
+		replaceableHandler.Handler = serv.Router
+		return nil
+	}
+
+	// otherwise run our own http server
+	serv.httpServer = &http.Server{
+		Addr:    serv.cfg.Server.ListenAddress,
+		Handler: serv.Router,
+	}
 
 	return serv.httpServer.ListenAndServe()
 }
@@ -91,7 +96,9 @@ func (serv *UploadServer) Shutdown() {
 	<-serv.GetStartedChan()
 
 	// wait for all requests to finish
-	serv.httpServer.Shutdown(nil)
+	if serv.httpServer != nil {
+		serv.httpServer.Shutdown(nil)
+	}
 
 	// stop running FileStore GC cycles
 	serv.expirer.Stop()
