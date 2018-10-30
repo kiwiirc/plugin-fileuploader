@@ -10,7 +10,10 @@
         "start": "webpack-dev-server"
     },
     "dependencies": {
-        "uppy": "^0.27.5"
+        "@uppy/core": "^0.27.3",
+        "@uppy/dashboard": "^0.27.5",
+        "@uppy/tus": "^0.27.5",
+        "@uppy/webcam": "^0.27.4"
     },
     "devDependencies": {
         "@babel/core": "^7.1.2",
