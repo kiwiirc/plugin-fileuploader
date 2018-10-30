@@ -1,5 +1,12 @@
-import { Core as Uppy, Dashboard, Tus, Webcam } from 'uppy'
-import 'uppy/dist/uppy.min.css'
+// polyfill globals for uppy on IE11
+import 'core-js/fn/array/iterator'
+// import 'core-js/fn/promise' // already included by kiwiirc
+
+import Uppy from '@uppy/core'
+import Dashboard from '@uppy/dashboard'
+import Tus from '@uppy/tus'
+import Webcam from '@uppy/webcam'
+import '@uppy/dashboard/dist/style.min.css'
 import sidebarFileList from './components/SidebarFileList.vue'
 
 const KiB = 2 ** 10
@@ -37,17 +44,6 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
     uploadFileButton.className = 'upload-file-button fa fa-upload'
 
     kiwi.addUi('input', uploadFileButton)
-
-    // add button to input bar
-    //const historyButton = document.createElement('i')
-    //historyButton.className = 'history-button fa fa-history'
-
-    // kiwi.addUi('input', historyButton)
-
-    //historyButton.onclick = e => {
-    //    kiwi.emit("sidebar.show")
-    //    kiwi.showInSidebar(sidebarFileList)
-    //}
 
     let c = new kiwi.Vue(sidebarFileList)
     c.$mount()
