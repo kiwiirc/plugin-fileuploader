@@ -4,7 +4,7 @@
             No files have recently been uploaded...
         </div>
         <div v-else class="kiwi-filebuffer-inner-container">
-            <div v-for="(file, idx) in fileList" :key="file" class="kiwi-filebuffer-download-container">
+            <div v-for="(file, idx) in fileList.slice().reverse()" :key="file" class="kiwi-filebuffer-download-container">
                 <a
                     :href="file.url"
                     @click.prevent.stop="loadContent(file.url)"
