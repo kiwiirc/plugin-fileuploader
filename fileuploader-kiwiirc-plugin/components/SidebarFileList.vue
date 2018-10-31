@@ -23,7 +23,9 @@
                         {{ file.fileName }}
                     </a>
                 </div>
-                <div class="kiwi-filebuffer-fileauthor" style="font-size: 11px;"> {{ file.nick }} &nbsp; {{ file.time }}</div>
+                <div class="kiwi-filebuffer-fileinfo"> {{ file.nick }}</div>
+                <div class="kiwi-filebuffer-fileinfo"> {{ file.time }}</div>
+                <div style="clear: both;"></div>
             </div>
         </div>
     </div>
@@ -49,8 +51,8 @@ export default {
             return name;
         },
         truncateNick(nick) {
-            if (nick.length >= 10) {
-                nick = nick.substring(0, 8) + "\u2026";
+            if (nick.length >= 13) {
+                nick = nick.substring(0, 11) + "\u2026";
             }
             return nick;
         },
@@ -94,14 +96,13 @@ export default {
 
 <style scoped>
 .kiwi-filebuffer-outer-container {
-    overflow: auto;
     height: 100%;
     width: 100%;
+    margin-top: -10px;
 }
 .kiwi-filebuffer-inner-container {
     font-family: arial, tahoma;
     width: 100%;
-    min-height: 40px;
 }
 .kiwi-filebuffer-download-container {
     margin: 0 0 5px 0;
@@ -110,23 +111,25 @@ export default {
     color: #eee;
 }
 .kiwi-filebuffer-downloadicon {
-  float: right;
-  margin-top: 3px;
-  margin-right: 3px;
-  border: 1px solid #fff;
-  border-radius: 50%;
-  padding: 7px;
-  font-size: 16px;
+    float: right;
+    margin-top: 3px;
+    margin-right: 3px;
+    border: 1px solid #fff;
+    border-radius: 50%;
+    padding: 7px;
+    font-size: 16px;
 }
 .kiwi-filebuffer-filetitle {
-  overflow: auto;
-  font-weight: bold;
-  line-height: normal;
-  margin-bottom: 5px;
+    font-weight: bold;
+    line-height: normal;
+    margin-bottom: 5px;
 }
-.kiwi-filebuffer-fileauthor {
-  opacity: 0.8;
-  line-height: normal;
+.kiwi-filebuffer-fileinfo {
+    float: left;
+    font-size: 11px;
+    width: 90px;
+    opacity: 0.8;
+    line-height: normal;
 }
 .kiwi-filebuffer-anchor {
     border: none;
