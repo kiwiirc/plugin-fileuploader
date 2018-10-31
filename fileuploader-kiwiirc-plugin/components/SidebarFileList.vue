@@ -7,13 +7,23 @@
             <div v-for="(file, idx) in fileList.slice().reverse()" :key="file" class="kiwi-filebuffer-download-container">
                 <a
                     :href="file.url"
-                    @click.prevent.stop="loadContent(file.url)"
                     class="kiwi-filebuffer-anchor"
+                    download
+                    title="Download File"
                 >
                     <i class="fa fa-download kiwi-filebuffer-downloadicon"/>
-                    <div class="kiwi-filebuffer-filetitle" style="font-size: 18px;">{{ file.fileName }}</div>
-                    <div class="kiwi-filebuffer-fileauthor" style="font-size: 11px;"> {{ file.nick }} &nbsp; {{ file.time }}</div>
                 </a>
+                <div class="kiwi-filebuffer-filetitle" style="font-size: 18px;">
+                    <a
+                        :href="file.url"
+                        @click.prevent.stop="loadContent(file.url)"
+                        class="kiwi-filebuffer-anchor"
+                        title="Preview File"
+                    >
+                        {{ file.fileName }}
+                    </a>
+                </div>
+                <div class="kiwi-filebuffer-fileauthor" style="font-size: 11px;"> {{ file.nick }} &nbsp; {{ file.time }}</div>
             </div>
         </div>
     </div>
@@ -109,6 +119,7 @@ export default {
   font-size: 16px;
 }
 .kiwi-filebuffer-filetitle {
+  overflow: auto;
   font-weight: bold;
   line-height: normal;
   margin-bottom: 5px;
