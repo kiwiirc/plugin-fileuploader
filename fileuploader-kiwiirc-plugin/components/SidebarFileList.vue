@@ -10,9 +10,9 @@
                     @click.prevent.stop="loadContent(file.url)"
                     class="kiwi-filebuffer-anchor"
                 >
-                    <i class="fa fa-download" style="float: right; font-size: 40px; margin-top:4px; margin-right: 3px;"/>
-                    <div style="font-size: 18px;">{{ file.fileName }}</div>
-                    <div style="font-size: 11px;"> {{ file.nick }} &nbsp;&nbsp; {{ file.time }}</div>
+                    <i class="fa fa-download kiwi-filebuffer-downloadicon"/>
+                    <div class="kiwi-filebuffer-filetitle" style="font-size: 18px;">{{ file.fileName }}</div>
+                    <div class="kiwi-filebuffer-fileauthor" style="font-size: 11px;"> {{ file.nick }} &nbsp; {{ file.time }}</div>
                 </a>
             </div>
         </div>
@@ -91,14 +91,31 @@ export default {
 .kiwi-filebuffer-inner-container {
     font-family: arial, tahoma;
     width: 100%;
+    min-height: 40px;
 }
 .kiwi-filebuffer-download-container {
-    margin: 10px;
-    border-radius: 5px;
-    padding: 5px;
-    padding-bottom: 0;
+    margin: 0 0 5px 0;
+    padding: 10px 10px;
     background: #666;
     color: #eee;
+}
+.kiwi-filebuffer-downloadicon {
+  float: right;
+  margin-top: 3px;
+  margin-right: 3px;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  padding: 7px;
+  font-size: 16px;
+}
+.kiwi-filebuffer-filetitle {
+  font-weight: bold;
+  line-height: normal;
+  margin-bottom: 5px;
+}
+.kiwi-filebuffer-fileauthor {
+  opacity: 0.8;
+  line-height: normal;
 }
 .kiwi-filebuffer-anchor {
     border: none;
