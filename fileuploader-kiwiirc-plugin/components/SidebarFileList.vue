@@ -10,6 +10,7 @@
                     class="kiwi-filebuffer-anchor"
                     download
                     title="Download File"
+                    target="_blank"
                 >
                     <i class="fa fa-download kiwi-filebuffer-downloadicon"/>
                 </a>
