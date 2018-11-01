@@ -7,6 +7,7 @@ import Dashboard from '@uppy/dashboard'
 import Tus from '@uppy/tus'
 import Webcam from '@uppy/webcam'
 import '@uppy/dashboard/dist/style.min.css'
+import sidebarFileList from './components/SidebarFileList.vue'
 
 const KiB = 2 ** 10
 const MiB = 2 ** 20
@@ -43,6 +44,10 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
     uploadFileButton.className = 'upload-file-button fa fa-upload'
 
     kiwi.addUi('input', uploadFileButton)
+
+    let c = new kiwi.Vue(sidebarFileList)
+    c.$mount()
+    kiwi.addUi('about_buffer', c.$el, {title: 'Shared Files'})
 
     const uppy = Uppy({
         autoProceed: false,
