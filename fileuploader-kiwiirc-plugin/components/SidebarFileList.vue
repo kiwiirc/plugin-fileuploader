@@ -98,7 +98,7 @@ export default {
 .kiwi-filebuffer-outer-container {
     height: 100%;
     width: 100%;
-    margin-top: -10px;
+    margin-top: 5px;
 }
 .kiwi-filebuffer-inner-container {
     font-family: arial, tahoma;
