@@ -37,7 +37,11 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
     // exposed api object
     kiwi.fileuploader = {}
 
-    const settings = kiwi.state.setting('fileuploader')
+    // default settings
+    kiwi.state.setSetting('settings.fileuploader.maxFileSize', 10 * MiB)
+    kiwi.state.setSetting('settings.fileuploader.server', '/files')
+    kiwi.state.setSetting('settings.fileuploader.textPastePromptMinimumLines', 5)
+    kiwi.state.setSetting('settings.fileuploader.textPasteNeverPrompt', false)
 
     // add button to input bar
     const uploadFileButton = document.createElement('i')
@@ -56,18 +60,18 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
             getValidUploadTarget()
         },
         restrictions: {
-            maxFileSize: settings.maxFileSize || 10 * MiB,
+            maxFileSize: kiwi.state.setting('fileuploader.maxFileSize'),
         },
     })
         .use(Dashboard, {
             trigger: uploadFileButton,
             proudlyDisplayPoweredByUppy: false,
             closeModalOnClickOutside: true,
-            note: settings.note,
+            note: kiwi.state.setting('fileuploader.note'),
         })
         .use(Webcam, { target: Dashboard })
         .use(Tus, {
-            endpoint: settings.server || '/files',
+            endpoint: kiwi.state.setting('fileuploader.server'),
             chunkSize: 512 * KiB,
         })
         .run()
@@ -109,10 +113,15 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
         // detect large text pastes, offer to create a file upload instead
         const text = cbData.getData('text')
         if (text) {
+            const promptDisabled = kiwi.state.setting('fileuploader.textPasteNeverPrompt')
+            if (promptDisabled) {
+                return
+            }
+            const minLines = kiwi.state.setting('fileuploader.textPastePromptMinimumLines')
             const network = kiwi.state.getActiveNetwork()
             const networkMaxLineLen =
                 network.ircClient.options.message_max_length
-            if (text.length > networkMaxLineLen || numLines(text) > 4) {
+            if (text.length > networkMaxLineLen || numLines(text) >= minLines) {
                 const msg =
                     'You pasted a lot of text.\nWould you like to upload as a file instead?'
                 if (window.confirm(msg)) {
