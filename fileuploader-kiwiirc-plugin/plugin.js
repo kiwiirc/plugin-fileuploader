@@ -37,11 +37,18 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
     // exposed api object
     kiwi.fileuploader = {}
 
+    function setDefaultSetting(settingKey, value) {
+        const fullKey = `settings.${settingKey}`
+        if (kiwi.state.getSetting(fullKey) === undefined) {
+            kiwi.state.setSetting(fullKey, value)
+        }
+    }
+
     // default settings
-    kiwi.state.setSetting('settings.fileuploader.maxFileSize', 10 * MiB)
-    kiwi.state.setSetting('settings.fileuploader.server', '/files')
-    kiwi.state.setSetting('settings.fileuploader.textPastePromptMinimumLines', 5)
-    kiwi.state.setSetting('settings.fileuploader.textPasteNeverPrompt', false)
+    setDefaultSetting('fileuploader.maxFileSize', 10 * MiB)
+    setDefaultSetting('fileuploader.server', '/files')
+    setDefaultSetting('fileuploader.textPastePromptMinimumLines', 5)
+    setDefaultSetting('fileuploader.textPasteNeverPrompt', false)
 
     // add button to input bar
     const uploadFileButton = document.createElement('i')
