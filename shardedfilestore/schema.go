@@ -40,6 +40,24 @@ func (store *ShardedFileStore) initDB() {
 				DROP TABLE uploads;
 				ALTER TABLE new_uploads RENAME TO uploads;`},
 			},
+			&migrate.Migration{
+				Id: "4",
+				Up: []string{`CREATE TABLE new_uploads(
+					id VARCHAR(36) PRIMARY KEY,
+					uploader_ip VARCHAR(45),
+					sha256sum BLOB,
+					created_at INTEGER(8),
+					deleted INTEGER(1) DEFAULT 0 NOT NULL,
+					jwt_account TEXT,
+					jwt_issuer TEXT
+				);
+				INSERT INTO new_uploads(id, uploader_ip, sha256sum, created_at, deleted)
+					SELECT id, uploader_ip, sha256sum, created_at, deleted
+					FROM uploads
+				;
+				DROP TABLE uploads;
+				ALTER TABLE new_uploads RENAME TO uploads;`},
+			},
 		},
 	}
 

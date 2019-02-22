@@ -79,7 +79,14 @@ func (store *ShardedFileStore) NewUpload(info tusd.FileInfo) (id string, err err
 	}
 
 	// create record in uploads table
-	err = db.UpdateRow(store.DBConn.DB, `INSERT INTO uploads(id, created_at) VALUES (?, ?)`, id, time.Now().Unix())
+	if info.MetaData["account"] == "" {
+		err = db.UpdateRow(store.DBConn.DB, `INSERT INTO uploads(id, created_at) VALUES (?, ?)`, id, time.Now().Unix())
+	} else {
+		err = db.UpdateRow(store.DBConn.DB,
+			`INSERT INTO uploads(id, created_at, jwt_account, jwt_issuer) VALUES (?, ?, ?, ?)`,
+			id, time.Now().Unix(), info.MetaData["account"], info.MetaData["issuer"],
+		)
+	}
 	if err != nil {
 		return "", err
 	}

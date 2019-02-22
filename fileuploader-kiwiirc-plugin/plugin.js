@@ -8,6 +8,8 @@ import Tus from '@uppy/tus'
 import Webcam from '@uppy/webcam'
 import '@uppy/dashboard/dist/style.min.css'
 import sidebarFileList from './components/SidebarFileList.vue'
+import isPromise from 'p-is-promise'
+import TokenManager from './token-manager';
 
 const KiB = 2 ** 10
 const MiB = 2 ** 20
@@ -33,7 +35,7 @@ function numLines(str) {
     return lines
 }
 
-kiwi.plugin('fileuploader', function(kiwi, log) {
+kiwi.plugin('fileuploader', function (kiwi, log) {
     // exposed api object
     kiwi.fileuploader = {}
 
@@ -58,13 +60,56 @@ kiwi.plugin('fileuploader', function(kiwi, log) {
 
     let c = new kiwi.Vue(sidebarFileList)
     c.$mount()
-    kiwi.addUi('about_buffer', c.$el, {title: 'Shared Files'})
+    kiwi.addUi('about_buffer', c.$el, { title: 'Shared Files' })
+
+    const tokenManager = new TokenManager()
 
     const uppy = Uppy({
         autoProceed: false,
         onBeforeFileAdded: (currentFile, files) => {
             // throws if invalid, canceling the file add
             getValidUploadTarget()
+        },
+        onBeforeUpload: files => {
+            const uniqNetworks = new Set(
+                Object.values(files)
+                    .map(file =>
+                        file.kiwiFileUploaderTargetBuffer.getNetwork()
+                    )
+            )
+
+            const tokens = new Map()
+            for (const network of uniqNetworks) {
+                tokens.set(network, tokenManager.get(network))
+            }
+
+            const tokenPromises = [...tokens.values()].filter(isPromise)
+            if (tokenPromises.length > 0) {
+                console.debug('Tokens were not available synchronously. Cancelling upload start and acquiring tokens.')
+
+                // restart uploads once all needed tokens are acquired
+                Promise.all(tokenPromises).then(() => {
+                    console.debug('Token acquisition complete. Restarting upload.')
+                    uppy.upload()
+                }).catch(err => {
+                    uppy.info({
+                        message: 'Unhandled error acquiring EXTJWT tokens!',
+                        details: err,
+                    }, 'error', 5000)
+                })
+
+                // prevent uploads from starting now
+                return false
+            }
+
+            // WARNING: don't use an immutable update pattern here!
+            // if we return new objects, uppy will ignore our changes
+            for (const fileObj of Object.values(files)) {
+                const token = tokenManager.get(fileObj.kiwiFileUploaderTargetBuffer.getNetwork())
+                if (token) { // token will be false if the server response was 'Unknown Command'
+                    fileObj.meta['extjwt'] = token
+                }
+            }
         },
         restrictions: {
             maxFileSize: kiwi.state.setting('fileuploader.maxFileSize'),

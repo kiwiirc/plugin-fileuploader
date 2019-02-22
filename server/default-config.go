@@ -28,8 +28,13 @@ Path = "./uploads.db"
 
 [Expiration]
 # Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-MaxAge = "168h" # 1 week
+MaxAge = "24h" # 1 day
+IdentifiedMaxAge = "168h" # 1 week
 CheckInterval = "5m"
+
+[JwtSecretsByIssuer]
+"example.com" = "examplesecret"
+"169.254.0.0" = "anothersecret"
 
 [Logging]
 Level = "info" # debug | info | warn | error | fatal | panic
