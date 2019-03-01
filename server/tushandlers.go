@@ -127,6 +127,20 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	return nil
 }
 
+func isFatalJwtError(err error) (fatal bool) {
+	fatal = true
+
+	// jwt.ValidationError<UnknownIssuerError> => non-fatal
+	if jwtValidationErr, ok := err.(*jwt.ValidationError); ok {
+		if _, ok := jwtValidationErr.Inner.(*UnknownIssuerError); ok {
+			fatal = false
+			return
+		}
+	}
+
+	return
+}
+
 func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		err := serv.addRemoteIPToMetadata(c.Request)
@@ -140,9 +154,15 @@ func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFun
 		}
 
 		err = serv.processJwt(c.Request)
+
 		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
-			return
+			if isFatalJwtError(err) {
+				c.AbortWithError(http.StatusInternalServerError, err)
+				return
+			}
+			log.Warn().
+				Err(err).
+				Msg("Failed to process EXTJWT")
 		}
 
 		handler.PostFile(c.Writer, c.Request)
@@ -177,6 +197,16 @@ func (serv *UploadServer) addRemoteIPToMetadata(req *http.Request) (err error) {
 	return
 }
 
+// UnknownIssuerError occurs when a file creation request includes an EXTJWT
+// with an issuer that is not present in the config
+type UnknownIssuerError struct {
+	Issuer string
+}
+
+func (e UnknownIssuerError) Error() string {
+	return fmt.Sprintf("Issuer %#v not configured", e.Issuer)
+}
+
 func (serv *UploadServer) getSecretForToken(token *jwt.Token) (interface{}, error) {
 	// Don't forget to validate the alg is what you expect:
 	if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -200,7 +230,8 @@ func (serv *UploadServer) getSecretForToken(token *jwt.Token) (interface{}, erro
 
 	secret, ok := serv.cfg.JwtSecretsByIssuer[issuerStr]
 	if !ok {
-		return nil, fmt.Errorf("Issuer %v not configured", issuer)
+		fmt.Printf("issuer: %#v\n", issuerStr)
+		return nil, &UnknownIssuerError{Issuer: issuerStr}
 	}
 
 	return []byte(secret), nil
