@@ -11,6 +11,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/kiwiirc/plugin-fileuploader/db"
 	"github.com/kiwiirc/plugin-fileuploader/events"
@@ -126,6 +127,20 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	return nil
 }
 
+func isFatalJwtError(err error) (fatal bool) {
+	fatal = true
+
+	// jwt.ValidationError<UnknownIssuerError> => non-fatal
+	if jwtValidationErr, ok := err.(*jwt.ValidationError); ok {
+		if _, ok := jwtValidationErr.Inner.(*UnknownIssuerError); ok {
+			fatal = false
+			return
+		}
+	}
+
+	return
+}
+
 func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		err := serv.addRemoteIPToMetadata(c.Request)
@@ -136,6 +151,18 @@ func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFun
 				c.AbortWithError(http.StatusNotAcceptable, err)
 			}
 			return
+		}
+
+		err = serv.processJwt(c.Request)
+
+		if err != nil {
+			if isFatalJwtError(err) {
+				c.AbortWithError(http.StatusInternalServerError, err)
+				return
+			}
+			log.Warn().
+				Err(err).
+				Msg("Failed to process EXTJWT")
 		}
 
 		handler.PostFile(c.Writer, c.Request)
@@ -167,6 +194,91 @@ func (serv *UploadServer) addRemoteIPToMetadata(req *http.Request) (err error) {
 	// override original header
 	req.Header.Set(uploadMetadataHeader, serializeMeta(metadata))
 
+	return
+}
+
+// UnknownIssuerError occurs when a file creation request includes an EXTJWT
+// with an issuer that is not present in the config
+type UnknownIssuerError struct {
+	Issuer string
+}
+
+func (e UnknownIssuerError) Error() string {
+	return fmt.Sprintf("Issuer %#v not configured", e.Issuer)
+}
+
+func (serv *UploadServer) getSecretForToken(token *jwt.Token) (interface{}, error) {
+	// Don't forget to validate the alg is what you expect:
+	if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("Failed to get claims")
+	}
+
+	issuer, ok := claims["iss"]
+	if !ok {
+		return nil, fmt.Errorf("Issuer field 'iss' missing from JWT")
+	}
+
+	issuerStr, ok := issuer.(string)
+	if !ok {
+		return nil, fmt.Errorf("Failed to coerce issuer to string")
+	}
+
+	secret, ok := serv.cfg.JwtSecretsByIssuer[issuerStr]
+	if !ok {
+		fmt.Printf("issuer: %#v\n", issuerStr)
+		return nil, &UnknownIssuerError{Issuer: issuerStr}
+	}
+
+	return []byte(secret), nil
+}
+
+func (serv *UploadServer) processJwt(req *http.Request) (err error) {
+	metadata := parseMeta(req.Header.Get("Upload-Metadata"))
+
+	// ensure the client doesn't attempt to specify their own account/issuer fields
+	for k := range metadata {
+		switch k {
+		case "account":
+		case "issuer":
+			return fmt.Errorf("Metadata field %#v cannot be set by client", k)
+		}
+	}
+
+	tokenString := metadata["extjwt"]
+	if tokenString == "" {
+		return nil
+	}
+
+	fmt.Println(tokenString)
+
+	token, err := jwt.Parse(tokenString, serv.getSecretForToken)
+	if err != nil {
+		return err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return
+	}
+
+	issuer := claims["iss"].(string)
+	account, ok := claims["account"].(string)
+	if !ok {
+		return nil
+	}
+
+	metadata["issuer"] = issuer
+	metadata["account"] = account
+
+	// override original header
+	req.Header.Set("Upload-Metadata", serializeMeta(metadata))
+
+	fmt.Printf("metadata updated: account=%v issuer=%v\n", account, issuer)
 	return
 }
 

@@ -61,7 +61,9 @@ func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 	serv.expirer = expirer.New(
 		serv.store,
 		serv.cfg.Expiration.MaxAge.Duration,
+		serv.cfg.Expiration.IdentifiedMaxAge.Duration,
 		serv.cfg.Expiration.CheckInterval.Duration,
+		serv.cfg.JwtSecretsByIssuer,
 	)
 
 	err := serv.registerTusHandlers(serv.Router, serv.store)

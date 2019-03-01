@@ -1,6 +1,7 @@
 package expirer
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
@@ -9,17 +10,21 @@ import (
 )
 
 type Expirer struct {
-	ticker   *time.Ticker
-	store    *shardedfilestore.ShardedFileStore
-	maxAge   time.Duration
-	quitChan chan struct{} // closes when ticker has been stopped
+	ticker             *time.Ticker
+	store              *shardedfilestore.ShardedFileStore
+	maxAge             time.Duration
+	identifiedMaxAge   time.Duration
+	jwtSecretsByIssuer map[string]string
+	quitChan           chan struct{} // closes when ticker has been stopped
 }
 
-func New(store *shardedfilestore.ShardedFileStore, maxAge, checkInterval time.Duration) *Expirer {
+func New(store *shardedfilestore.ShardedFileStore, maxAge, identifiedMaxAge, checkInterval time.Duration, jwtSecretsByIssuer map[string]string) *Expirer {
 	expirer := &Expirer{
 		time.NewTicker(checkInterval),
 		store,
 		maxAge,
+		identifiedMaxAge,
+		jwtSecretsByIssuer,
 		make(chan struct{}),
 	}
 
@@ -81,9 +86,15 @@ func (expirer *Expirer) gc(t time.Time) {
 func (expirer *Expirer) getExpired() (expiredIds []string, err error) {
 	rows, err := expirer.store.DBConn.DB.Query(`
 		SELECT id FROM uploads
-		WHERE created_at < ?
+		WHERE
+			CAST(strftime('%s', 'now') AS INTEGER) -- current time
+			>=
+			created_at + (CASE WHEN jwt_account IS NULL THEN :maxAge ELSE :identifiedMaxAge END) -- expiration time
 		AND deleted != 1
-	`, time.Now().Add(-expirer.maxAge).Unix())
+		`,
+		sql.Named("maxAge", expirer.maxAge.Seconds()),
+		sql.Named("identifiedMaxAge", expirer.identifiedMaxAge.Seconds()),
+	)
 
 	if rows == nil || err != nil {
 		return

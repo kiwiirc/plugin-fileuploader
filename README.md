@@ -11,27 +11,22 @@ after a set time period discourages users from using the server as a permanent f
 
 #### Dependencies
 * yarn (https://yarnpkg.com/ - for the kiwiirc plugin UI)
-* dep (https://github.com/golang/dep - for the server)
-
 
 #### Downloading the file upload server's source code
 
 ```console
-$ go get github.com/kiwiirc/plugin-fileuploader
-$ cd "$(go env GOPATH)/src/github.com/kiwiirc/plugin-fileuploader"
+$ git clone https://github.com/kiwiirc/plugin-fileuploader.git && cd plugin-fileuploader
 ```
 
 #### Running the file upload server from source
 
 ```console
-$ dep ensure
-$ go run *.go
+$ go run .
 ```
 
 #### Building the server for production
 ```console
-$ dep ensure
-$ go build -o fileuploader *.go
+$ go build
 ```
 
 #### Running the server as a webircgateway plugin

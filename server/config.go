@@ -31,9 +31,11 @@ type Config struct {
 		Path string
 	}
 	Expiration struct {
-		MaxAge        duration
-		CheckInterval duration
+		MaxAge           duration
+		IdentifiedMaxAge duration
+		CheckInterval    duration
 	}
+	JwtSecretsByIssuer map[string]string
 	Logging struct {
 		Level      loglevel
 		RemoteSink *struct {
