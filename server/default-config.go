@@ -33,8 +33,8 @@ IdentifiedMaxAge = "168h" # 1 week
 CheckInterval = "5m"
 
 [JwtSecretsByIssuer]
-"example.com" = "examplesecret"
-"169.254.0.0" = "anothersecret"
+# "example.com" = "examplesecret"
+# "169.254.0.0" = "anothersecret"
 
 [Logging]
 Level = "info" # debug | info | warn | error | fatal | panic
