@@ -36,6 +36,6 @@ module.exports = {
         contentBase: path.join(__dirname, 'dist'),
         compress: true,
         host: process.env.HOST || 'localhost',
-        port: 41040,
+        port: process.env.PORT || 41040,
     },
 }
