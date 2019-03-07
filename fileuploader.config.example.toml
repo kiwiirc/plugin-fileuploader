@@ -29,6 +29,14 @@ MaxAge = "24h" # 1 day
 IdentifiedMaxAge = "168h" # 1 week
 CheckInterval = "5m"
 
+# If EXTJWT is supported by the gateway or network, a validated token with an account present (when
+# the user is authenticated to an irc services account) will use the IdentifiedMaxAge setting above
+# instead of the base MaxAge.
+#
+# The HMAC secret used to sign the token is needed here to be able to validate the token.
+#
+# When using a webircgateway, the issuer will be the network_common_address of the upstream server
+# if set. Otherwise it will be the hostname used to connect to the network.
 [JwtSecretsByIssuer]
 # "example.com" = "examplesecret"
 # "169.254.0.0" = "anothersecret"
