@@ -157,7 +157,12 @@ func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFun
 
 		if err != nil {
 			if isFatalJwtError(err) {
-				c.AbortWithError(http.StatusInternalServerError, err)
+				if jwtValidationErr, ok := err.(*jwt.ValidationError); ok && jwtValidationErr.Inner == jwt.ErrSignatureInvalid {
+					c.Error(jwtValidationErr).SetType(gin.ErrorTypePublic)
+					c.AbortWithStatusJSON(http.StatusUnauthorized, fmt.Sprintf("Failed to process EXTJWT: %s. Configured secret may be incorrect.", jwtValidationErr))
+					return
+				}
+				c.AbortWithError(http.StatusBadRequest, err).SetType(gin.ErrorTypePublic)
 				return
 			}
 			log.Warn().
