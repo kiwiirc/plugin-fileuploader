@@ -1,12 +1,13 @@
 // polyfill globals for uppy on IE11
-import 'core-js/fn/array/iterator'
-// import 'core-js/fn/promise' // already included by kiwiirc
+import 'core-js/features/array/iterator'
+// import 'core-js/features/promise' // already included by kiwiirc
 
 import Uppy from '@uppy/core'
 import Dashboard from '@uppy/dashboard'
 import Tus from '@uppy/tus'
 import Webcam from '@uppy/webcam'
-import '@uppy/dashboard/dist/style.min.css'
+import '@uppy/core/dist/style.css'
+import '@uppy/dashboard/dist/style.css'
 import sidebarFileList from './components/SidebarFileList.vue'
 import isPromise from 'p-is-promise'
 import TokenManager from './token-manager';
@@ -215,18 +216,16 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
         file.kiwiFileUploaderTargetBuffer = getValidUploadTarget()
     })
 
-    uppy.on('upload-success', (file, resp, uploadURL) => {
+    uppy.on('upload-success', (file, response) => {
         // append filename to uploadURL
-        uploadURL = `${uploadURL}/${encodeURIComponent(file.meta.name)}`
-        uppy.setFileState(file.id, { uploadURL })
-        file = uppy.getFile(file.id)
+        const url = `${response.uploadURL}/${encodeURIComponent(file.meta.name)}`
 
         // emit a global kiwi event
-        kiwi.emit('fileuploader.uploaded', { url: uploadURL, file })
+        kiwi.emit('fileuploader.uploaded', { url, file })
 
         // send a message with the url of each successful upload
         const buffer = file.kiwiFileUploaderTargetBuffer
-        buffer.say(`Uploaded file: ${uploadURL}`)
+        buffer.say(`Uploaded file: ${url}`)
     })
 
     uppy.on('complete', result => {

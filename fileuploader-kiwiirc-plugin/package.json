@@ -10,25 +10,30 @@
         "start": "webpack-dev-server"
     },
     "dependencies": {
-        "@uppy/core": "^0.27.3",
-        "@uppy/dashboard": "^0.27.5",
-        "@uppy/tus": "^0.27.5",
-        "@uppy/webcam": "^0.27.4",
-        "p-is-promise": "^2.0.0",
-        "vue": "^2.5.17",
-        "vue-loader": "^15.4.2",
-        "vue-template-compiler": "^2.5.17"
+        "@uppy/core": "^1.0.0",
+        "@uppy/dashboard": "^1.0.0",
+        "@uppy/tus": "^1.0.0",
+        "@uppy/webcam": "^1.0.0",
+        "core-js": "^3.0.1",
+        "p-is-promise": "^2.1.0",
+        "vue": "^2.6.10",
+        "vue-loader": "^15.7.0",
+        "vue-template-compiler": "^2.6.10"
     },
     "devDependencies": {
-        "@babel/core": "^7.1.2",
-        "@babel/polyfill": "^7.0.0",
-        "@babel/preset-env": "^7.1.0",
-        "babel-loader": "^8.0.4",
-        "css-loader": "^1.0.0",
-        "prettier": "^1.14.3",
+        "@babel/core": "^7.4.4",
+        "@babel/polyfill": "^7.4.4",
+        "@babel/preset-env": "^7.4.4",
+        "babel-loader": "^8.0.5",
+        "brotli-webpack-plugin": "^1.1.0",
+        "clean-webpack-plugin": "^2.0.2",
+        "compression-webpack-plugin": "^2.0.0",
+        "css-loader": "^2.1.1",
+        "mini-css-extract-plugin": "^0.6.0",
+        "prettier": "^1.17.0",
         "style-loader": "^0.23.1",
-        "webpack": "^4.23.1",
-        "webpack-cli": "^3.1.2",
-        "webpack-dev-server": "^3.1.10"
+        "webpack": "^4.30.0",
+        "webpack-cli": "^3.3.1",
+        "webpack-dev-server": "^3.3.1"
     }
 }
