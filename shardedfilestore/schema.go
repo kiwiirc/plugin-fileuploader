@@ -8,7 +8,7 @@ import (
 func (store *ShardedFileStore) initDB() {
 	migrations := &migrate.MemoryMigrationSource{
 		Migrations: []*migrate.Migration{
-			&migrate.Migration{
+			{
 				Id: "1",
 				Up: []string{`CREATE TABLE uploads(
 					id VARCHAR(36) PRIMARY KEY,
@@ -18,13 +18,13 @@ func (store *ShardedFileStore) initDB() {
 				);`},
 				Down: []string{"DROP TABLE uploads;"},
 			},
-			&migrate.Migration{
+			{
 				Id: "2",
 				Up: []string{`ALTER TABLE uploads
 					ADD deleted INTEGER(1) DEFAULT 0 NOT NULL
 				;`},
 			},
-			&migrate.Migration{
+			{
 				Id: "3",
 				Up: []string{`CREATE TABLE new_uploads(
 					id VARCHAR(36) PRIMARY KEY,
@@ -40,7 +40,7 @@ func (store *ShardedFileStore) initDB() {
 				DROP TABLE uploads;
 				ALTER TABLE new_uploads RENAME TO uploads;`},
 			},
-			&migrate.Migration{
+			{
 				Id: "4",
 				Up: []string{`CREATE TABLE new_uploads(
 					id VARCHAR(36) PRIMARY KEY,

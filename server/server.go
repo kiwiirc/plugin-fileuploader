@@ -9,13 +9,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 func RunServer(router *http.ServeMux, configPath string) {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
 	var wg sync.WaitGroup
 
 	reloadRequested := make(chan struct{}, 1)

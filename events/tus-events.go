@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/tus/tusd"
-	"github.com/tus/tusd/cmd/tusd/cli"
+	"github.com/tus/tusd/cmd/tusd/cli/hooks"
 )
 
 // how many events can be unread by a listener before everything starts to block
@@ -12,7 +12,7 @@ const bufferSize = 16
 
 type TusEvent struct {
 	Info tusd.FileInfo
-	Type cli.HookType
+	Type hooks.HookType
 }
 
 type TusEventBroadcaster struct {
@@ -61,13 +61,13 @@ func (b *TusEventBroadcaster) readLoop(handler *tusd.UnroutedHandler) {
 	for {
 		select {
 		case info := <-handler.CompleteUploads:
-			b.broadcast(cli.HookPostFinish, info)
+			b.broadcast(hooks.HookPostFinish, info)
 		case info := <-handler.TerminatedUploads:
-			b.broadcast(cli.HookPostTerminate, info)
+			b.broadcast(hooks.HookPostTerminate, info)
 		case info := <-handler.UploadProgress:
-			b.broadcast(cli.HookPostReceive, info)
+			b.broadcast(hooks.HookPostReceive, info)
 		case info := <-handler.CreatedUploads:
-			b.broadcast(cli.HookPostCreate, info)
+			b.broadcast(hooks.HookPostCreate, info)
 		case _, ok := <-b.quitChan:
 			if !ok {
 				return
@@ -76,7 +76,7 @@ func (b *TusEventBroadcaster) readLoop(handler *tusd.UnroutedHandler) {
 	}
 }
 
-func (b *TusEventBroadcaster) broadcast(hookType cli.HookType, info tusd.FileInfo) {
+func (b *TusEventBroadcaster) broadcast(hookType hooks.HookType, info tusd.FileInfo) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 

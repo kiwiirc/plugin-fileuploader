@@ -19,7 +19,7 @@ import (
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 	"github.com/rs/zerolog/log"
 	"github.com/tus/tusd"
-	"github.com/tus/tusd/cmd/tusd/cli"
+	"github.com/tus/tusd/cmd/tusd/cli/hooks"
 )
 
 func routePrefixFromBasePath(basePath string) (string, error) {
@@ -235,7 +235,6 @@ func (serv *UploadServer) getSecretForToken(token *jwt.Token) (interface{}, erro
 
 	secret, ok := serv.cfg.JwtSecretsByIssuer[issuerStr]
 	if !ok {
-		fmt.Printf("issuer: %#v\n", issuerStr)
 		return nil, &UnknownIssuerError{Issuer: issuerStr}
 	}
 
@@ -258,8 +257,6 @@ func (serv *UploadServer) processJwt(req *http.Request) (err error) {
 	if tokenString == "" {
 		return nil
 	}
-
-	fmt.Println(tokenString)
 
 	token, err := jwt.Parse(tokenString, serv.getSecretForToken)
 	if err != nil {
@@ -351,7 +348,7 @@ func (serv *UploadServer) ipRecorder(broadcaster *events.TusEventBroadcaster) {
 		if !ok {
 			return // channel closed
 		}
-		if event.Type == cli.HookPostCreate {
+		if event.Type == hooks.HookPostCreate {
 			go func() {
 				ip := event.Info.MetaData["RemoteIP"]
 

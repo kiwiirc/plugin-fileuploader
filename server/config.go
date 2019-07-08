@@ -36,8 +36,10 @@ type Config struct {
 		CheckInterval    duration
 	}
 	JwtSecretsByIssuer map[string]string
-	Logging struct {
+	Logging            struct {
 		Level      loglevel
+		Format     format
+		Output     output
 		RemoteSink *struct {
 			LogLevel loglevel
 			Format   format
@@ -57,14 +59,23 @@ func NewConfig() *Config {
 	return cfg
 }
 
+var defaultGlobalLogger = log.Logger
+
 func (cfg *Config) Load(configPath string) error {
-	log.Info().Str("path", configPath).Msg("Loading config file")
 	_, configLoadErr := toml.DecodeFile(configPath, cfg)
 
-	// set log level as early as possible so it affects early logging
+	// configure main logger
 	zerolog.SetGlobalLevel(cfg.Logging.Level.Level)
+	switch cfg.Logging.Format.string {
+	case "pretty":
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: cfg.Logging.Output})
+	case "json":
+		log.Logger = defaultGlobalLogger
+	}
 
-	if configLoadErr != nil {
+	if configLoadErr == nil {
+		log.Info().Str("path", configPath).Msg("Loaded config file")
+	} else {
 		log.Error().Err(configLoadErr).Msg("Failed to parse config")
 	}
 
@@ -167,10 +178,30 @@ func (f *format) UnmarshalText(text []byte) error {
 	formatStr := string(text)
 	switch formatStr {
 	case "json":
+		fallthrough
+	case "pretty":
 		f.string = formatStr
-		break
 	default:
 		return errors.New("Unsupported log serialization format: " + formatStr)
+	}
+	return nil
+}
+
+////////////////////////////////////////////////////////////////
+
+type output struct {
+	*os.File
+}
+
+func (o *output) UnmarshalText(text []byte) error {
+	outputStr := string(text)
+	switch outputStr {
+	case "stderr":
+		o.File = os.Stderr
+	case "stdout":
+		o.File = os.Stdout
+	default:
+		return errors.New("Unsupported log output: " + outputStr)
 	}
 	return nil
 }

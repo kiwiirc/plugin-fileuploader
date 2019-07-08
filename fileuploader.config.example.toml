@@ -43,6 +43,8 @@ CheckInterval = "5m"
 
 [Logging]
 Level = "info" # debug | info | warn | error | fatal | panic
+Format = "pretty" # pretty | json
+Output = "stderr" # stderr | stdout
 
 	# [Logging.RemoteSink]
 	# # example receiver for testing: socat UDP-RECV:10101,bind=127.0.0.1 STDOUT
