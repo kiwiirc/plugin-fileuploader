@@ -9,29 +9,47 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
+	globalZerolog "github.com/rs/zerolog/log"
 )
 
-func RunServer(router *http.ServeMux, configPath string) {
-	var wg sync.WaitGroup
+type RunContext struct {
+	ShutdownPromise sync.WaitGroup
 
-	reloadRequested := make(chan struct{}, 1)
-	done := make(chan struct{}, 1)
+	parentRouter    *http.ServeMux
+	configPath      string
+	reloadSignals   chan os.Signal
+	shutdownSignals chan os.Signal
+	log             *zerolog.Logger
+}
 
+func NewRunContext(parentRouter *http.ServeMux, configPath string) *RunContext {
+	runCtx := &RunContext{
+		parentRouter:    parentRouter,
+		configPath:      configPath,
+		log:             &globalZerolog.Logger, // default global zerolog
+		reloadSignals:   make(chan os.Signal, 1),
+		shutdownSignals: make(chan os.Signal, 1),
+	}
+	runCtx.ShutdownPromise.Add(1)
+	return runCtx
+}
+
+func (runCtx *RunContext) Run() {
 	// signal handler
-	go signalHandler(reloadRequested, done)
+	go runCtx.signalHandler()
 
 	// server run loop
-	wg.Add(1)
-	go runLoop(reloadRequested, done, &wg, router, configPath)
+	go runCtx.runLoop()
 
-	wg.Wait()
-	log.Info().
+	runCtx.ShutdownPromise.Wait()
+
+	runCtx.log.Info().
 		Str("event", "shutdown").
 		Msg("Shutdown complete")
 }
 
-func signalHandler(reloadRequested, done chan struct{}) {
+func (runCtx *RunContext) signalHandler() {
 	signals := make(chan os.Signal, 1)
 
 	signal.Notify(signals, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
@@ -40,20 +58,19 @@ func signalHandler(reloadRequested, done chan struct{}) {
 		switch sig := <-signals; sig {
 
 		case syscall.SIGHUP:
-			reloadRequested <- struct{}{}
+			runCtx.reloadSignals <- sig
 
 		case syscall.SIGINT:
 			fallthrough
 		case syscall.SIGTERM:
-			done <- struct{}{}
-
+			runCtx.shutdownSignals <- sig
 		}
 	}
 }
 
-func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRouter *http.ServeMux, configPath string) {
+func (runCtx *RunContext) runLoop() {
 	var replaceableHandler *ReplaceableHandler
-	if parentRouter != nil {
+	if runCtx.parentRouter != nil {
 		replaceableHandler = &ReplaceableHandler{}
 	}
 	registeredPrefixes := make(map[string]struct{}, 0)
@@ -61,27 +78,40 @@ func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRout
 	for {
 		// new server instance
 		serv := UploadServer{}
-		serv.cfg = *NewConfig()
+		cfg := NewConfig()
 
 		// refresh config
-		err := serv.cfg.Load(configPath)
+		err := cfg.Load(runCtx.log, runCtx.configPath)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to load config")
+			runCtx.log.Error().Err(err).Msg("Failed to load config")
+			return
 		}
 
+		serv.cfg = *cfg
+
+		multiLogger, err := createMultiLogger(serv.cfg.Loggers)
+		if err != nil {
+			runCtx.log.Err(err).Msg("Failed to create MultiLogger")
+		}
+
+		runCtx.log = multiLogger
+		serv.log = runCtx.log
+		runCtx.log.Info().Str("path", runCtx.configPath).Msg("Loaded config file")
+		cfg.DoPostLoadLogging(runCtx.log, runCtx.configPath)
+
 		// register handler on parentRouter if any, when prefix has not been previously registered
-		if parentRouter != nil {
+		if runCtx.parentRouter != nil {
 			routePrefix, err := routePrefixFromBasePath(serv.cfg.Server.BasePath)
 			if err != nil {
 				panic(err)
 			}
 			if _, ok := registeredPrefixes[routePrefix]; !ok { // this prefix not yet registered
 				registeredPrefixes[routePrefix] = struct{}{}
-				parentRouter.Handle(routePrefix, replaceableHandler)
+				runCtx.parentRouter.Handle(routePrefix, replaceableHandler)
 				if !strings.HasSuffix(routePrefix, "/") {
-					parentRouter.Handle(routePrefix+"/", replaceableHandler)
+					runCtx.parentRouter.Handle(routePrefix+"/", replaceableHandler)
 				}
-				log.Info().
+				runCtx.log.Info().
 					Str("event", "startup").
 					Str("routePrefix", routePrefix).
 					Msg("Fileuploader handler mounted on parent router")
@@ -100,8 +130,8 @@ func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRout
 
 		// wait for startup to complete
 		<-serv.GetStartedChan()
-		if parentRouter == nil {
-			log.Info().
+		if runCtx.parentRouter == nil {
+			runCtx.log.Info().
 				Str("event", "startup").
 				Str("address", serv.cfg.Server.ListenAddress).
 				Msg("Server listening")
@@ -116,7 +146,7 @@ func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRout
 				fmt.Printf("errChan: %#v\n", err)
 				// quit if unexpected error occurred
 				if err != http.ErrServerClosed {
-					log.Fatal().
+					runCtx.log.Fatal().
 						Err(err).
 						Msg("Error running upload server")
 				}
@@ -124,26 +154,26 @@ func runLoop(reloadRequested, done chan struct{}, wg *sync.WaitGroup, parentRout
 				// server closed by request, exit loop to allow it to restart
 				return true
 
-			case <-reloadRequested:
+			case <-runCtx.reloadSignals:
 				// Run in separate goroutine so we don't wait for .Shutdown()
 				// to return before starting the new server.
 				// This allows us to handle outstanding requests using the old
 				// server instance while we've already replaced it as the listener
 				// for new connections.
 				go func() {
-					log.Info().
+					runCtx.log.Info().
 						Str("event", "config_reload").
 						Msg("Reloading server config")
 					serv.Shutdown()
 				}()
 				return true
 
-			case <-done:
-				log.Info().
+			case <-runCtx.shutdownSignals:
+				runCtx.log.Info().
 					Str("event", "shutdown_started").
 					Msg("Shutdown initiated. Handling existing requests")
 				serv.Shutdown()
-				wg.Done()
+				runCtx.ShutdownPromise.Done()
 				return false
 
 			}

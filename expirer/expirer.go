@@ -5,8 +5,7 @@ import (
 	"time"
 
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
-
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 type Expirer struct {
@@ -16,16 +15,18 @@ type Expirer struct {
 	identifiedMaxAge   time.Duration
 	jwtSecretsByIssuer map[string]string
 	quitChan           chan struct{} // closes when ticker has been stopped
+	log                *zerolog.Logger
 }
 
-func New(store *shardedfilestore.ShardedFileStore, maxAge, identifiedMaxAge, checkInterval time.Duration, jwtSecretsByIssuer map[string]string) *Expirer {
+func New(store *shardedfilestore.ShardedFileStore, maxAge, identifiedMaxAge, checkInterval time.Duration, jwtSecretsByIssuer map[string]string, log *zerolog.Logger) *Expirer {
 	expirer := &Expirer{
-		time.NewTicker(checkInterval),
-		store,
-		maxAge,
-		identifiedMaxAge,
-		jwtSecretsByIssuer,
-		make(chan struct{}),
+		ticker:             time.NewTicker(checkInterval),
+		store:              store,
+		maxAge:             maxAge,
+		identifiedMaxAge:   identifiedMaxAge,
+		jwtSecretsByIssuer: jwtSecretsByIssuer,
+		quitChan:           make(chan struct{}),
+		log:                log,
 	}
 
 	go func() {
@@ -56,13 +57,13 @@ func (expirer *Expirer) Stop() {
 }
 
 func (expirer *Expirer) gc(t time.Time) {
-	log.Debug().
+	expirer.log.Debug().
 		Str("event", "gc_tick").
 		Msg("Filestore GC tick")
 
 	expiredIds, err := expirer.getExpired()
 	if err != nil {
-		log.Error().
+		expirer.log.Error().
 			Err(err).
 			Msg("Failed to enumerate expired uploads")
 		return
@@ -71,12 +72,12 @@ func (expirer *Expirer) gc(t time.Time) {
 	for _, id := range expiredIds {
 		err = expirer.store.Terminate(id)
 		if err != nil {
-			log.Error().
+			expirer.log.Error().
 				Err(err).
 				Msg("Failed to terminate expired upload")
 			continue
 		}
-		log.Info().
+		expirer.log.Info().
 			Str("event", "expired").
 			Str("id", id).
 			Msg("Terminated upload id")

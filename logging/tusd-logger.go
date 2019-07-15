@@ -7,21 +7,21 @@ import (
 	"strings"
 
 	"github.com/kiwiirc/plugin-fileuploader/events"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
-func TusdLogger(broadcaster *events.TusEventBroadcaster) {
+func TusdLogger(log *zerolog.Logger, broadcaster *events.TusEventBroadcaster) {
 	channel := broadcaster.Listen()
 	for {
 		event, ok := <-channel
 		if !ok {
 			return // channel closed
 		}
-		go handleTusEvent(event)
+		go handleTusEvent(log, event)
 	}
 }
 
-func handleTusEvent(event *events.TusEvent) {
+func handleTusEvent(log *zerolog.Logger, event *events.TusEvent) {
 	logEvent := log.Info().
 		Str("event", strings.Replace(string(event.Type), "-", "_", -1)).
 		Str("id", event.Info.ID).

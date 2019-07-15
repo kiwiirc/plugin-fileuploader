@@ -2,7 +2,10 @@ package server
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -11,8 +14,13 @@ import (
 	"github.com/c2h5oh/datasize"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
+
+type LoggerConfig struct {
+	Level  logLevel
+	Format logFormat
+	Output logOutput
+}
 
 type Config struct {
 	Server struct {
@@ -36,50 +44,24 @@ type Config struct {
 		CheckInterval    duration
 	}
 	JwtSecretsByIssuer map[string]string
-	Logging            struct {
-		Level      loglevel
-		Format     format
-		Output     output
-		RemoteSink *struct {
-			LogLevel loglevel
-			Format   format
-			Protocol string
-			Address  string
-		}
-	}
+	Loggers            []LoggerConfig
 }
 
 func NewConfig() *Config {
 	cfg := &Config{}
 	_, err := toml.Decode(defaultConfig, cfg)
 	if err != nil {
-		log.Fatal().Err(err).
-			Msg("Failed to decode defaultConfig")
+		panic("Failed to decode defaultConfig")
 	}
 	return cfg
 }
 
-var defaultGlobalLogger = log.Logger
-
-func (cfg *Config) Load(configPath string) error {
+func (cfg *Config) Load(log *zerolog.Logger, configPath string) error {
 	_, configLoadErr := toml.DecodeFile(configPath, cfg)
+	return configLoadErr
+}
 
-	// configure main logger
-	zerolog.SetGlobalLevel(cfg.Logging.Level.Level)
-	switch cfg.Logging.Format.string {
-	case "pretty":
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: cfg.Logging.Output})
-	case "json":
-		log.Logger = defaultGlobalLogger
-	}
-
-	if configLoadErr == nil {
-		log.Info().Str("path", configPath).Msg("Loaded config file")
-	} else {
-		log.Error().Err(configLoadErr).Msg("Failed to parse config")
-	}
-
-	// just debug logging
+func (cfg *Config) DoPostLoadLogging(log *zerolog.Logger, configPath string) {
 	if len(cfg.Server.TrustedReverseProxyRanges) > 0 {
 		ranges := []string{}
 		for _, rang := range cfg.Server.TrustedReverseProxyRanges {
@@ -89,55 +71,68 @@ func (cfg *Config) Load(configPath string) error {
 			Strs("trustedCidrs", ranges).
 			Msg("Trusting reverse proxies")
 	}
+}
 
-	// dial the remote sinks and configure logger to output to them
-	if sink := cfg.Logging.RemoteSink; sink != nil {
-		log.Debug().
-			Str("protocol", sink.Protocol).
-			Str("address", sink.Address).
-			Str("format", sink.Format.string).
-			Str("level", sink.LogLevel.String()).
-			Msg("Sending logs to")
-		conn, err := net.Dial(sink.Protocol, sink.Address)
-		level := sink.LogLevel.Level
-		if err != nil {
-			log.Error().
-				Err(err).
-				Str("protocol", sink.Protocol).
-				Str("address", sink.Address).
-				Msg("Failed to dial network log sink")
-		} else {
-			log.Logger = log.Output(
-				zerolog.MultiLevelWriter(
-					logging.SelectiveLevelWriter{
-						zerolog.ConsoleWriter{Out: os.Stderr},
-						cfg.Logging.Level.Level,
-					},
-					logging.SelectiveLevelWriter{
-						conn,
-						level,
-					},
-				),
-			)
-
-			// events must pass through the global log level before our
-			// SelectiveLevelWriters can filter them down
-			zerolog.SetGlobalLevel(logging.MaxLevel(cfg.Logging.Level.Level, level))
+func createMultiLogger(loggerConfigs []LoggerConfig) (*zerolog.Logger, error) {
+	var writers []io.Writer
+	for _, loggerCfg := range loggerConfigs {
+		var output io.Writer
+		url := loggerCfg.Output.URL
+		switch url.Scheme {
+		case "file":
+			file, err := os.OpenFile(url.Opaque, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0640)
+			if err != nil {
+				return nil, err
+			}
+			output = file
+		case "stderr":
+			output = os.Stderr
+		case "stdout":
+			output = os.Stdout
+		case "unix":
+			fallthrough
+		case "udp":
+			fallthrough
+		case "tcp":
+			conn, err := net.Dial(url.Scheme, url.Opaque)
+			if err != nil {
+				return nil, err
+			}
+			output = conn
+		default:
+			fmt.Printf("working url %#v\n", url)
+			return nil, errors.New("invalid log url scheme: " + url.Scheme)
 		}
-		return err
+
+		switch loggerCfg.Format {
+		case logFormat{"json"}:
+			break
+		case logFormat{"pretty"}:
+			output = zerolog.ConsoleWriter{Out: output}
+		default:
+			return nil, errors.New("invalid log format")
+		}
+
+		levelWriter := logging.SelectiveLevelWriter{
+			Writer: output,
+			Level:  loggerCfg.Level.Level,
+		}
+		writers = append(writers, levelWriter)
 	}
-	return nil
+
+	multiLogger := zerolog.New(zerolog.MultiLevelWriter(writers...)).With().Timestamp().Logger()
+	return &multiLogger, nil
 }
 
 ////////////////////////////////////////////////////////////////
 //     private types implementing encoding.TextUnmarshaler    //
 ////////////////////////////////////////////////////////////////
 
-type loglevel struct {
+type logLevel struct {
 	zerolog.Level
 }
 
-func (l *loglevel) UnmarshalText(text []byte) error {
+func (l *logLevel) UnmarshalText(text []byte) error {
 	levelStr := strings.ToLower(string(text))
 	level, err := zerolog.ParseLevel(levelStr)
 	l.Level = level
@@ -170,11 +165,11 @@ func (d *duration) UnmarshalText(text []byte) error {
 
 ////////////////////////////////////////////////////////////////
 
-type format struct {
+type logFormat struct {
 	string
 }
 
-func (f *format) UnmarshalText(text []byte) error {
+func (f *logFormat) UnmarshalText(text []byte) error {
 	formatStr := string(text)
 	switch formatStr {
 	case "json":
@@ -189,19 +184,16 @@ func (f *format) UnmarshalText(text []byte) error {
 
 ////////////////////////////////////////////////////////////////
 
-type output struct {
-	*os.File
+type logOutput struct {
+	*url.URL
 }
 
-func (o *output) UnmarshalText(text []byte) error {
-	outputStr := string(text)
-	switch outputStr {
-	case "stderr":
-		o.File = os.Stderr
-	case "stdout":
-		o.File = os.Stdout
-	default:
-		return errors.New("Unsupported log output: " + outputStr)
+func (o *logOutput) UnmarshalText(text []byte) error {
+	str := string(text)
+	u, err := url.Parse(str)
+	if err != nil {
+		return err
 	}
+	o.URL = u
 	return nil
 }

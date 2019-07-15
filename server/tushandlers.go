@@ -17,7 +17,6 @@ import (
 	"github.com/kiwiirc/plugin-fileuploader/events"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
-	"github.com/rs/zerolog/log"
 	"github.com/tus/tusd"
 	"github.com/tus/tusd/cmd/tusd/cli/hooks"
 )
@@ -61,7 +60,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	store.UseIn(composer)
 
 	maximumUploadSize := serv.cfg.Storage.MaximumUploadSize
-	log.Debug().Str("size", maximumUploadSize.String()).Msg("Using upload limit")
+	serv.log.Debug().Str("size", maximumUploadSize.String()).Msg("Using upload limit")
 
 	config := tusd.Config{
 		BasePath:                serv.cfg.Server.BasePath,
@@ -88,7 +87,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	serv.tusEventBroadcaster = events.NewTusEventBroadcaster(handler)
 
 	// attach logger
-	go logging.TusdLogger(serv.tusEventBroadcaster)
+	go logging.TusdLogger(serv.log, serv.tusEventBroadcaster)
 
 	// attach uploader IP recorder
 	go serv.ipRecorder(serv.tusEventBroadcaster)
@@ -165,7 +164,7 @@ func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFun
 				c.AbortWithError(http.StatusBadRequest, err).SetType(gin.ErrorTypePublic)
 				return
 			}
-			log.Warn().
+			serv.log.Warn().
 				Err(err).
 				Msg("Failed to process EXTJWT")
 		}
@@ -291,7 +290,7 @@ func (serv *UploadServer) getDirectOrForwardedRemoteIP(req *http.Request) (strin
 	// extract direct IP
 	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		log.Error().
+		serv.log.Error().
 			Err(err).
 			Msg("Could not split address into host and port")
 		return "", err
@@ -312,7 +311,7 @@ func (serv *UploadServer) getDirectOrForwardedRemoteIP(req *http.Request) (strin
 			forwardedForIP := net.ParseIP(forwardedForClient)
 			if forwardedForIP == nil {
 				err := ErrInvalidXForwardedFor
-				log.Error().
+				serv.log.Error().
 					Err(err).
 					Str("client", forwardedForClient).
 					Str("remoteIP", remoteIP).
@@ -321,7 +320,7 @@ func (serv *UploadServer) getDirectOrForwardedRemoteIP(req *http.Request) (strin
 			}
 			return forwardedForIP.String(), nil
 		}
-		log.Warn().
+		serv.log.Warn().
 			Str("X-Forwarded-For", forwardedFor).
 			Str("remoteIP", remoteIP).
 			Msg("Untrusted remote attempted to override stored IP")
@@ -352,7 +351,7 @@ func (serv *UploadServer) ipRecorder(broadcaster *events.TusEventBroadcaster) {
 			go func() {
 				ip := event.Info.MetaData["RemoteIP"]
 
-				log.Debug().
+				serv.log.Debug().
 					Str("id", event.Info.ID).
 					Str("ip", ip).
 					Msg("Recording uploader IP")
@@ -364,7 +363,7 @@ func (serv *UploadServer) ipRecorder(broadcaster *events.TusEventBroadcaster) {
 				`, ip, event.Info.ID)
 
 				if err != nil {
-					log.Error().
+					serv.log.Error().
 						Err(err).
 						Msg("Failed to record uploader IP")
 				}

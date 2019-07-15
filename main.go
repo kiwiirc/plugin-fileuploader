@@ -9,5 +9,6 @@ import (
 func main() {
 	var configPath = flag.String("config", "fileuploader.config.toml", "path to config file")
 	flag.Parse()
-	server.RunServer(nil, *configPath)
+	runCtx := server.NewRunContext(nil, *configPath)
+	runCtx.Run()
 }

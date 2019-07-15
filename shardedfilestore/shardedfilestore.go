@@ -19,7 +19,7 @@ import (
 	_ "github.com/go-sql-driver/mysql" // register mysql driver
 	"github.com/kiwiirc/plugin-fileuploader/db"
 	_ "github.com/mattn/go-sqlite3" // register SQL driver
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	lockfile "gopkg.in/Acconut/lockfile.v1"
 
 	"github.com/tus/tusd"
@@ -35,15 +35,21 @@ type ShardedFileStore struct {
 	BasePath          string // Relative or absolute path to store files in.
 	PrefixShardLayers int    // Number of extra directory layers to prefix file paths with.
 	DBConn            *db.DatabaseConnection
+	log               *zerolog.Logger
 }
 
 // New creates a new file based storage backend. The directory specified will
 // be used as the only storage entry. This method does not check
 // whether the path exists, use os.MkdirAll to ensure.
 // In addition, a locking mechanism is provided.
-func New(basePath string, prefixShardLayers int, dbConnection *db.DatabaseConnection) *ShardedFileStore {
+func New(basePath string, prefixShardLayers int, dbConnection *db.DatabaseConnection, log *zerolog.Logger) *ShardedFileStore {
 
-	store := &ShardedFileStore{basePath, prefixShardLayers, dbConnection}
+	store := &ShardedFileStore{
+		BasePath:          basePath,
+		PrefixShardLayers: prefixShardLayers,
+		DBConn:            dbConnection,
+		log:               log,
+	}
 	store.initDB()
 	return store
 }
@@ -220,7 +226,7 @@ func (store *ShardedFileStore) Terminate(id string) error {
 		if err := RemoveWithDirs(binPath, store.BasePath); err != nil {
 			return err
 		}
-		log.Info().
+		store.log.Info().
 			Str("event", "blob_deleted").
 			Str("binPath", binPath).
 			Msg("Removed upload bin")
@@ -359,7 +365,7 @@ func (store ShardedFileStore) completeBinPath(hashBytes []byte) string {
 func (store *ShardedFileStore) binPath(id string) string {
 	hashBytes, isFinal, err := store.lookupHash(id)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Could not look up hash")
+		store.log.Fatal().Err(err).Msg("Could not look up hash")
 	}
 
 	if !isFinal {
@@ -399,7 +405,7 @@ func (store *ShardedFileStore) writeInfo(id string, info tusd.FileInfo) error {
 
 // FinishUpload deduplicates the upload by its cryptographic hash
 func (store *ShardedFileStore) FinishUpload(id string) error {
-	log.Debug().
+	store.log.Debug().
 		Str("event", "upload_finished").
 		Str("id", id).Msg("Finishing upload")
 
@@ -425,7 +431,7 @@ func (store *ShardedFileStore) FinishUpload(id string) error {
 	oldPath := store.incompleteBinPath(id)
 	err = os.Rename(oldPath, newPath)
 	if err != nil {
-		log.Error().
+		store.log.Error().
 			Err(err).
 			Str("oldPath", oldPath).
 			Str("newPath", newPath).

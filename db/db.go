@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 type DBConfig struct {
@@ -18,7 +18,7 @@ type DatabaseConnection struct {
 	DBConfig
 }
 
-func ConnectToDB(dbConfig DBConfig) *DatabaseConnection {
+func ConnectToDB(log *zerolog.Logger, dbConfig DBConfig) *DatabaseConnection {
 	if !strings.Contains(dbConfig.DSN, "?") {
 		// Add the default connection options if none are given
 		switch dbConfig.DriverName {

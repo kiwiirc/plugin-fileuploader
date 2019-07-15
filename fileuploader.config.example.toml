@@ -41,21 +41,24 @@ CheckInterval = "5m"
 # "example.com" = "examplesecret"
 # "169.254.0.0" = "anothersecret"
 
-[Logging]
+[[Loggers]]
 Level = "info" # debug | info | warn | error | fatal | panic
 Format = "pretty" # pretty | json
-Output = "stderr" # stderr | stdout
+Output = "stderr:" # stderr: | stdout: | file:/path | udp:ip:port | unix:/path
 
-	# [Logging.RemoteSink]
-	# # example receiver for testing: socat UDP-RECV:10101,bind=127.0.0.1 STDOUT
-	# LogLevel = "info"
-	# Format = "json" # json only for now
-	# Protocol = "udp" # upd | unix
-	# Address = "127.0.0.1:10101"
+# [[Loggers]]
+# Level = "debug"
+# Format = "json"
+# Output = "file:./debug.log"
 
-	# [Logging.RemoteSink]
-	# # example receiver for testing: socat UNIX-LISTEN:./log.sock,fork STDOUT
-	# LogLevel = "info"
-	# Format = "json"
-	# Protocol = "unix"
-	# Address = "./log.sock" # filesystem path to unix socket
+# [[Loggers]]
+# # example receiver for testing: socat UDP-RECV:10101,bind=127.0.0.1 STDOUT
+# Level = "info"
+# Format = "json"
+# Output = "udp:127.0.0.1:10101"
+
+# [[Loggers]]
+# # example receiver for testing: socat UNIX-LISTEN:./log.sock,fork STDOUT
+# Level = "info"
+# Format = "json"
+# Output = "unix:./log.sock" # filesystem path to unix socket

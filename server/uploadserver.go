@@ -10,15 +10,18 @@ import (
 	"github.com/kiwiirc/plugin-fileuploader/expirer"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
+	"github.com/rs/zerolog"
 )
 
 // UploadServer is a simple configurable service for file sharing.
 // Compatible with TUS upload clients.
 type UploadServer struct {
+	DBConn *db.DatabaseConnection
+	Router *gin.Engine
+
 	cfg                 Config
-	DBConn              *db.DatabaseConnection
+	log                 *zerolog.Logger
 	store               *shardedfilestore.ShardedFileStore
-	Router              *gin.Engine
 	expirer             *expirer.Expirer
 	httpServer          *http.Server
 	startedMu           sync.Mutex
@@ -45,9 +48,9 @@ func init() {
 // Run starts the UploadServer
 func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 	serv.Router = gin.New()
-	serv.Router.Use(logging.GinLogger(), gin.Recovery())
+	serv.Router.Use(logging.GinLogger(serv.log), gin.Recovery())
 
-	serv.DBConn = db.ConnectToDB(db.DBConfig{
+	serv.DBConn = db.ConnectToDB(serv.log, db.DBConfig{
 		DriverName: serv.cfg.Database.Type,
 		DSN:        serv.cfg.Database.Path,
 	})
@@ -56,6 +59,7 @@ func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 		serv.cfg.Storage.Path,
 		serv.cfg.Storage.ShardLayers,
 		serv.DBConn,
+		serv.log,
 	)
 
 	serv.expirer = expirer.New(
@@ -64,6 +68,7 @@ func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 		serv.cfg.Expiration.IdentifiedMaxAge.Duration,
 		serv.cfg.Expiration.CheckInterval.Duration,
 		serv.cfg.JwtSecretsByIssuer,
+		serv.log,
 	)
 
 	err := serv.registerTusHandlers(serv.Router, serv.store)
