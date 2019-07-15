@@ -49,19 +49,34 @@ type Config struct {
 
 func NewConfig() *Config {
 	cfg := &Config{}
-	_, err := toml.Decode(defaultConfig, cfg)
+	md, err := toml.Decode(defaultConfig, cfg)
 	if err != nil {
 		panic("Failed to decode defaultConfig")
+	}
+	undecoded := md.Undecoded()
+	if len(undecoded) > 0 {
+		panic(fmt.Sprintf("Undecoded keys: %q", undecoded))
 	}
 	return cfg
 }
 
-func (cfg *Config) Load(log *zerolog.Logger, configPath string) error {
-	_, configLoadErr := toml.DecodeFile(configPath, cfg)
-	return configLoadErr
+func (cfg *Config) Load(log *zerolog.Logger, configPath string) (toml.MetaData, error) {
+	md, configLoadErr := toml.DecodeFile(configPath, cfg)
+	return md, configLoadErr
 }
 
-func (cfg *Config) DoPostLoadLogging(log *zerolog.Logger, configPath string) {
+func (cfg *Config) DoPostLoadLogging(log *zerolog.Logger, configPath string, md toml.MetaData) {
+	undecoded := md.Undecoded()
+	if len(undecoded) > 0 {
+		var keys []string
+		for _, key := range undecoded {
+			keys = append(keys, key.String())
+		}
+		log.Warn().
+			Strs("keys", keys).
+			Msg("Extraneous configuration data")
+	}
+
 	if len(cfg.Server.TrustedReverseProxyRanges) > 0 {
 		ranges := []string{}
 		for _, rang := range cfg.Server.TrustedReverseProxyRanges {

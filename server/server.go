@@ -81,7 +81,7 @@ func (runCtx *RunContext) runLoop() {
 		cfg := NewConfig()
 
 		// refresh config
-		err := cfg.Load(runCtx.log, runCtx.configPath)
+		md, err := cfg.Load(runCtx.log, runCtx.configPath)
 		if err != nil {
 			runCtx.log.Error().Err(err).Msg("Failed to load config")
 			return
@@ -97,7 +97,7 @@ func (runCtx *RunContext) runLoop() {
 		runCtx.log = multiLogger
 		serv.log = runCtx.log
 		runCtx.log.Info().Str("path", runCtx.configPath).Msg("Loaded config file")
-		cfg.DoPostLoadLogging(runCtx.log, runCtx.configPath)
+		cfg.DoPostLoadLogging(runCtx.log, runCtx.configPath, md)
 
 		// register handler on parentRouter if any, when prefix has not been previously registered
 		if runCtx.parentRouter != nil {
