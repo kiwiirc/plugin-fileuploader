@@ -61,7 +61,7 @@ Add the plugin javascript file to your kiwiirc `config.json` and configure the s
 	"plugins": [
 		{
 			"name": "fileuploader",
-			"url": "http://localhost:9000/main.js"
+			"url": "http://localhost:9000/plugin-fileuploader.js"
 		}
 	],
 	"fileuploader": {
