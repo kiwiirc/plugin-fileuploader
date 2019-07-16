@@ -5,7 +5,14 @@ const defaultConfig = `
 ListenAddress = "127.0.0.1:8088"
 BasePath = "/files"
 # BasePath = "https://example.com/files" # external URL for use behind reverse proxy
+
+# Cross-Origin Resource Sharing (CORS)
+# 	If the server will be accessed from a different Origin than the KiwiIRC
+# 	client, it is necessary to explicitly allow the KiwiIRC origin. See
+# 	https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS for more detail
+CorsOrigins = []
 # CorsOrigins = [ "http://example.com" , "https://example.org" ]
+# CorsOrigins = [ "*" ] # to allow all
 
 # Requests from these networks will have their X-Forwarded-For headers trusted
 TrustedReverseProxyRanges = [
@@ -68,5 +75,4 @@ Output = "stderr:" # stderr: | stdout: | file:/path | udp:ip:port | unix:/path
 # Level = "info"
 # Format = "json"
 # Output = "unix:./log.sock" # filesystem path to unix socket
-
 `
