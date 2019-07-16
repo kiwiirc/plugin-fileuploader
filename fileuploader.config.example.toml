@@ -1,5 +1,11 @@
 [Server]
+# Note: ListenAddress is not used when running as a webircgateway plugin.  In
+# those situations, the listen addresses of the webircgateway will be used,
+# including HTTPS if configured.
 ListenAddress = "127.0.0.1:8088"
+
+# When running as a webircgateway plugin, this path will be relative to the
+# webircgateway domain, e.g. https://ws.irc.example.com/files
 BasePath = "/files"
 # BasePath = "https://example.com/files" # external URL for use behind reverse proxy
 

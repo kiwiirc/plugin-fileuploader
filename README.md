@@ -72,6 +72,12 @@ Add the plugin javascript file to your kiwiirc `config.json` and configure the s
 }
 ```
 
+If you're running the fileuploader server as a webircgateway plugin, use the webircgateway hostname, e.g.
+
+```json
+		"server": "https://ws.irc.example.com/files",
+```
+
 ## Database configuration
 File uploads are logged into a database. Currently the supported databases are sqlite3 and mysql.
 
