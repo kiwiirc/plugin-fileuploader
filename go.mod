@@ -13,9 +13,10 @@ require (
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gobuffalo/packr v1.30.1 // indirect
 	github.com/golang/mock v1.3.1 // indirect
+	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
 	github.com/igm/sockjs-go v2.0.1+incompatible // indirect
-	github.com/kiwiirc/webircgateway v0.0.0-20190530134910-ecd4a7eba288
+	github.com/kiwiirc/webircgateway v0.0.0-20190709195406-2c86038cda4f
 	github.com/lib/pq v1.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.8 // indirect
 	github.com/mattn/go-sqlite3 v1.10.0
@@ -24,14 +25,15 @@ require (
 	github.com/rubenv/sql-migrate v0.0.0-20190618074426-f4d34eae5a5c
 	github.com/sethgrid/pester v0.0.0-20190127155807-68a33a018ad0 // indirect
 	github.com/smartystreets/assertions v1.0.0 // indirect
-	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
-	github.com/tus/tusd v0.0.0-20190624173856-9c0d753f7ddd
-	github.com/ugorji/go v1.1.5-pre // indirect
+	github.com/smartystreets/goconvey v0.0.0-20190710185942-9d28bd7c0945 // indirect
+	github.com/tus/tusd v0.0.0-20190712143443-30811b6579c5
+	github.com/ugorji/go v1.1.7 // indirect
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
-	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb // indirect
+	golang.org/x/sys v0.0.0-20190712062909-fae7ac547cb7 // indirect
 	google.golang.org/appengine v1.6.1 // indirect
 	gopkg.in/Acconut/lockfile.v1 v1.1.0
 	gopkg.in/gorp.v1 v1.7.2 // indirect
+	gopkg.in/ini.v1 v1.44.0 // indirect
 )
