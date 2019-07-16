@@ -20,7 +20,10 @@ ShardLayers = 6
 MaximumUploadSize = "10 MB" # accepts units such as: MB, g, tB, peta, kilobytes, gigabyte
 
 [Database]
-Type = "sqlite3" # mysql
+Type = "sqlite3" # sqlite3 | mysql
+
+# for sqlite3: a filesystem path
+# for mysql: a DSN like "user:password@tcp(127.0.0.1:3306)/database". see https://github.com/go-sql-driver/mysql#dsn-data-source-name
 Path = "./uploads.db"
 
 [Expiration]

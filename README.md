@@ -73,10 +73,10 @@ Add the plugin javascript file to your kiwiirc `config.json` and configure the s
 ```
 
 ## Database configuration
-File uploads are logged into a database. Currently the supported databases are sqlite and mysql.
+File uploads are logged into a database. Currently the supported databases are sqlite3 and mysql.
 
-* `DATABASE_TYPE` can either by `sqlite` or `mysql`. The default is `sqlite`.
-* `DATABASE_PATH` is the path to your database file for sqlite. For mysql it is a DSN in the format `user:password@tcp(127.0.0.1:3306)/database`.
+* `Database.Type` can either be `sqlite3` or `mysql`. The default is `sqlite3`.
+* `Database.Path` is the path to your database file for sqlite3. For mysql it is a DSN in the format `user:password@tcp(127.0.0.1:3306)/database`. See: https://github.com/go-sql-driver/mysql#dsn-data-source-name
 
 ## License
 
