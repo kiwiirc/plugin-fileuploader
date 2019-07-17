@@ -8,6 +8,7 @@ import Tus from '@uppy/tus'
 import Webcam from '@uppy/webcam'
 import '@uppy/core/dist/style.css'
 import '@uppy/dashboard/dist/style.css'
+import '@uppy/webcam/dist/style.css'
 import sidebarFileList from './components/SidebarFileList.vue'
 import isPromise from 'p-is-promise'
 import TokenManager from './token-manager';
