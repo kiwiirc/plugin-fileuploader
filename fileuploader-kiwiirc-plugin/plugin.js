@@ -9,6 +9,7 @@ import Webcam from '@uppy/webcam'
 import '@uppy/core/dist/style.css'
 import '@uppy/dashboard/dist/style.css'
 import '@uppy/webcam/dist/style.css'
+import Translator from '@uppy/utils/lib/Translator'
 import sidebarFileList from './components/SidebarFileList.vue'
 import isPromise from 'p-is-promise'
 import TokenManager from './token-manager';
@@ -66,7 +67,21 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 
     const tokenManager = new TokenManager()
 
+    function loadLocale(_lang) {
+        try {
+            let lang = (_lang ? _lang : kiwi.i18n.language).split('-')
+            lang = lang[0] + '_' + lang[1].toUpperCase()
+            return require(/* webpackMode: "eager" */ '@uppy/locales/lib/' + lang)
+        } catch (e) {
+            return require(/* webpackMode: "eager" */ '@uppy/locales/lib/en_US')
+        }
+    }
+
+    // load our currnet locale or fallback
+    let locale = loadLocale()
+
     const uppy = Uppy({
+        locale: locale,
         autoProceed: false,
         onBeforeFileAdded: (currentFile, files) => {
             // throws if invalid, canceling the file add
@@ -131,6 +146,30 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
         .run()
 
     const dashboard = uppy.getPlugin('Dashboard')
+
+    kiwi.state.$watch('user_settings.language', (lang) => {
+        // update uppy core
+        uppy.opts.locale = loadLocale(lang)
+        uppy.translator = new Translator([ uppy.defaultLocale, uppy.opts.locale ])
+        uppy.locale = uppy.translator.locale
+        uppy.i18n = uppy.translator.translate.bind(uppy.translator)
+        uppy.i18nArray = uppy.translator.translateArray.bind(uppy.translator)
+        uppy.setState()
+
+        // update uppy plugins
+        uppy.iteratePlugins(function(plugin) {
+            if (plugin.translator) {
+                plugin.translator = uppy.translator
+            }
+            if (plugin.i18n) {
+                plugin.i18n = uppy.i18n
+            }
+            if (plugin.i18nArray) {
+                plugin.i18nArray = uppy.i18nArray
+            }
+            plugin.setPluginState()
+        });
+    });
 
     // expose plugin api
     kiwi.fileuploader.uppy = uppy

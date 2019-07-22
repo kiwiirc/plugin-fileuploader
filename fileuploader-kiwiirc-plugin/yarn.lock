@@ -745,6 +745,11 @@
     "@uppy/utils" "1.1.0"
     preact "8.2.9"
 
+"@uppy/locales@^1.5.0":
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/@uppy/locales/-/locales-1.5.0.tgz#f190d074d2eee396c2c8687340ded647faf94287"
+  integrity sha512-PWKYS9tqkL7N/3Qj8Q/get5g2mkbnHrTnjZXLDBkJaJ2EVPgDSHLIDxLtXUaTbohF6L1qLiARtidH9cae7A29g==
+
 "@uppy/provider-views@1.1.0":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@uppy/provider-views/-/provider-views-1.1.0.tgz#f03c1af0b488b759d7ba2f11b51ecadfffe4e8f3"
