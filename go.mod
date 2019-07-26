@@ -16,6 +16,7 @@ require (
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
 	github.com/igm/sockjs-go v2.0.1+incompatible // indirect
+	github.com/jmoiron/sqlx v1.2.0
 	github.com/kiwiirc/webircgateway v0.0.0-20190709195406-2c86038cda4f
 	github.com/lib/pq v1.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.8 // indirect

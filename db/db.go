@@ -1,9 +1,10 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
+
+	"github.com/jmoiron/sqlx"
 
 	"github.com/rs/zerolog"
 )
@@ -14,7 +15,7 @@ type DBConfig struct {
 }
 
 type DatabaseConnection struct {
-	DB *sql.DB
+	DB *sqlx.DB
 	DBConfig
 }
 
@@ -29,7 +30,7 @@ func ConnectToDB(log *zerolog.Logger, dbConfig DBConfig) *DatabaseConnection {
 		}
 	}
 
-	db, err := sql.Open(dbConfig.DriverName, dbConfig.DSN)
+	db, err := sqlx.Open(dbConfig.DriverName, dbConfig.DSN)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Could not open database")
 	}
@@ -49,7 +50,7 @@ func ConnectToDB(log *zerolog.Logger, dbConfig DBConfig) *DatabaseConnection {
 }
 
 // UpdateRow wraps db.Exec and ensures that exactly one row was affected
-func UpdateRow(db *sql.DB, query string, args ...interface{}) (err error) {
+func UpdateRow(db *sqlx.DB, query string, args ...interface{}) (err error) {
 	res, err := db.Exec(query, args...)
 	if err != nil {
 		return

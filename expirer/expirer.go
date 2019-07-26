@@ -1,7 +1,6 @@
 package expirer
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
@@ -85,33 +84,33 @@ func (expirer *Expirer) gc(t time.Time) {
 }
 
 func (expirer *Expirer) getExpired() (expiredIds []string, err error) {
-	rows, err := expirer.store.DBConn.DB.Query(`
-		SELECT id FROM uploads
-		WHERE
-			CAST(strftime('%s', 'now') AS INTEGER) -- current time
-			>=
-			created_at + (CASE WHEN jwt_account IS NULL THEN :maxAge ELSE :identifiedMaxAge END) -- expiration time
-		AND deleted != 1
-		`,
-		sql.Named("maxAge", expirer.maxAge.Seconds()),
-		sql.Named("identifiedMaxAge", expirer.identifiedMaxAge.Seconds()),
-	)
-
-	if rows == nil || err != nil {
-		return
-	}
-
-	defer rows.Close()
-
-	var id string
-
-	for rows.Next() {
-		err = rows.Scan(&id)
-		if err != nil {
-			return
-		}
-
-		expiredIds = append(expiredIds, id)
+	switch expirer.store.DBConn.DBConfig.DriverName {
+	case "sqlite3":
+		err = expirer.store.DBConn.DB.Select(&expiredIds, `
+			SELECT id FROM uploads
+			WHERE
+				CAST(strftime('%s', 'now') AS INTEGER) -- current time
+				>=
+				created_at + (CASE WHEN jwt_account IS NULL THEN $1 ELSE $2 END) -- expiration time
+			AND deleted != 1
+			`,
+			expirer.maxAge.Seconds(),
+			expirer.identifiedMaxAge.Seconds(),
+		)
+	case "mysql":
+		err = expirer.store.DBConn.DB.Select(&expiredIds, `
+			SELECT id FROM uploads
+			WHERE
+				UNIX_TIMESTAMP() -- current time
+				>=
+				created_at + (CASE WHEN jwt_account IS NULL THEN ? ELSE ? END) -- expiration time
+			AND deleted != 1
+			`,
+			expirer.maxAge.Seconds(),
+			expirer.identifiedMaxAge.Seconds(),
+		)
+	default:
+		panic("Unhandled database driver")
 	}
 
 	return
