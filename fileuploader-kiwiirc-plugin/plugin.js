@@ -67,21 +67,7 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 
     const tokenManager = new TokenManager()
 
-    function loadLocale(_lang) {
-        try {
-            let lang = (_lang ? _lang : kiwi.i18n.language).split('-')
-            lang = lang[0] + '_' + lang[1].toUpperCase()
-            return require(/* webpackMode: "eager" */ '@uppy/locales/lib/' + lang)
-        } catch (e) {
-            return require(/* webpackMode: "eager" */ '@uppy/locales/lib/en_US')
-        }
-    }
-
-    // load our currnet locale or fallback
-    let locale = loadLocale()
-
     const uppy = Uppy({
-        locale: locale,
         autoProceed: false,
         onBeforeFileAdded: (currentFile, files) => {
             // throws if invalid, canceling the file add
@@ -147,9 +133,29 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
 
     const dashboard = uppy.getPlugin('Dashboard')
 
-    kiwi.state.$watch('user_settings.language', (lang) => {
+    function loadLocale(_lang) {
+        try {
+            let lang = (_lang ? _lang : kiwi.i18n.language).split('-')
+            let langUppy = lang[0] + '_' + lang[1].toUpperCase()
+            import(
+                /* webpackMode: "eager" */
+                `@uppy/locales/lib/${langUppy}.js`
+            ).then(locale => {
+                setLocale(locale)
+            });
+        } catch (e) {
+            import(
+                /* webpackMode: "eager" */
+                `@uppy/locales/lib/en_US.js`
+            ).then(locale => {
+                setLocale(locale)
+            });
+        }
+    }
+
+    function setLocale(locale) {
         // update uppy core
-        uppy.opts.locale = loadLocale(lang)
+        uppy.opts.locale = locale
         uppy.translator = new Translator([ uppy.defaultLocale, uppy.opts.locale ])
         uppy.locale = uppy.translator.locale
         uppy.i18n = uppy.translator.translate.bind(uppy.translator)
@@ -169,6 +175,11 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
             }
             plugin.setPluginState()
         });
+    }
+
+    loadLocale()
+    kiwi.state.$watch('user_settings.language', (lang) => {
+        loadLocale(lang)
     });
 
     // expose plugin api
