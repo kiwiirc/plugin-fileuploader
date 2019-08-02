@@ -1,14 +1,14 @@
-const path = require('path');
-const VueLoaderPlugin = require('vue-loader/lib/plugin');
-const CompressionPlugin = require('compression-webpack-plugin');
-const BrotliPlugin = require('brotli-webpack-plugin');
-const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const path = require('path')
+const VueLoaderPlugin = require('vue-loader/lib/plugin')
+const CompressionPlugin = require('compression-webpack-plugin')
+const BrotliPlugin = require('brotli-webpack-plugin')
+const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 
 const shouldCompress = /\.(js|css|html|svg)(\.map)?$/
 
 module.exports = {
     mode: 'production',
-    entry: './plugin.js',
+    entry: './src/fileuploader-entry.js',
     output: {
         filename: 'plugin-fileuploader.js',
     },
@@ -27,6 +27,7 @@ module.exports = {
                         ['@babel/preset-env', {
                             useBuiltIns: 'usage',
                             corejs: 3,
+                            // debug: true,
                         }],
                     ],
                 },

@@ -1,5 +1,6 @@
-import CacheLoader from './cache-loader';
-import isPromise from 'p-is-promise';
+import isPromise from 'p-is-promise'
+
+import CacheLoader from './cache-loader'
 
 const seconds = 1000
 const minutes = 60 * seconds
