@@ -1,7 +1,8 @@
+import { friendlyUrl } from '../../utils/friendly-url'
+
 export function shareCompletedUploadUrl(kiwiApi) {
     return function handleUploadSuccess(file, response) {
-        // append filename to uploadURL
-        const url = `${response.uploadURL}/${encodeURIComponent(file.meta.name)}`
+        const url = friendlyUrl(file, response)
 
         // emit a global kiwi event
         kiwiApi.emit('fileuploader.uploaded', { url, file })

@@ -4,7 +4,7 @@
             No files have recently been uploaded...
         </div>
         <div v-else class="kiwi-filebuffer-inner-container">
-            <div v-for="(file, idx) in fileList.slice().reverse()" :key="file" class="kiwi-filebuffer-download-container">
+            <div v-for="(file, idx) in fileList.slice().reverse()" :key="file.url" class="kiwi-filebuffer-download-container">
                 <a
                     :href="file.url"
                     class="kiwi-filebuffer-anchor"
@@ -89,7 +89,7 @@ export default {
     },
     computed: {
         fileList() {
-            return this.sharedFiles(kiwi.state.getActiveBuffer()) 
+            return this.sharedFiles(kiwi.state.getActiveBuffer())
         }
     },
 }

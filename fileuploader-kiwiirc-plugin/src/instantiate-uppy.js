@@ -2,75 +2,55 @@ import Uppy from '@uppy/core'
 import Dashboard from '@uppy/dashboard'
 import Tus from '@uppy/tus'
 import Webcam from '@uppy/webcam'
-import isPromise from 'p-is-promise'
 
 import { KiB } from './constants/data-size'
+import acquireExtjwtBeforeUpload from './handlers/uppy/acquire-extjwt-before-upload'
 import { getValidUploadTarget } from './utils/get-valid-upload-target'
 
-export default function instantiateUppy({ kiwiApi, tokenManager, uploadFileButton }) {
-    const uppy = Uppy({
+export default function instantiateUppy({
+    kiwiApi,
+    tokenManager,
+    uploadFileButton,
+    dashboardOptions,
+    tusOptions,
+    uppyOptions,
+}) {
+    const effectiveDashboardOpts = {
+        trigger: uploadFileButton,
+        proudlyDisplayPoweredByUppy: false,
+        closeModalOnClickOutside: true,
+        note: kiwiApi.state.setting('fileuploader.note'),
+        ...dashboardOptions,
+    }
+
+    const effectiveTusOpts = {
+        endpoint: kiwiApi.state.setting('fileuploader.server'),
+        chunkSize: 512 * KiB,
+        ...tusOptions,
+    }
+
+    const { handlerContext, handleBeforeUpload } = acquireExtjwtBeforeUpload(tokenManager)
+
+    const effectiveUppyOpts = {
         autoProceed: false,
         onBeforeFileAdded: (/* currentFile, files */) => {
             // throws if invalid, cancelling the file add
             getValidUploadTarget(kiwiApi)
         },
-        onBeforeUpload: files => {
-            const uniqNetworks = new Set(
-                Object.values(files)
-                    .map(file =>
-                        file.kiwiFileUploaderTargetBuffer.getNetwork()
-                    )
-            )
-
-            const tokens = new Map()
-            for (const network of uniqNetworks) {
-                tokens.set(network, tokenManager.get(network))
-            }
-
-            const tokenPromises = [...tokens.values()].filter(isPromise)
-            if (tokenPromises.length > 0) {
-                console.debug('Tokens were not available synchronously. Cancelling upload start and acquiring tokens.')
-
-                // restart uploads once all needed tokens are acquired
-                Promise.all(tokenPromises).then(() => {
-                    console.debug('Token acquisition complete. Restarting upload.')
-                    uppy.upload()
-                }).catch(err => {
-                    uppy.info({
-                        message: 'Unhandled error acquiring EXTJWT tokens!',
-                        details: err,
-                    }, 'error', 5000)
-                })
-
-                // prevent uploads from starting now
-                return false
-            }
-
-            // WARNING: don't use an immutable update pattern here!
-            // if we return new objects, uppy will ignore our changes
-            for (const fileObj of Object.values(files)) {
-                const token = tokenManager.get(fileObj.kiwiFileUploaderTargetBuffer.getNetwork())
-                if (token) { // token will be false if the server response was 'Unknown Command'
-                    fileObj.meta['extjwt'] = token
-                }
-            }
-        },
+        onBeforeUpload: handleBeforeUpload,
         restrictions: {
             maxFileSize: kiwiApi.state.setting('fileuploader.maxFileSize'),
         },
-    })
-        .use(Dashboard, {
-            trigger: uploadFileButton,
-            proudlyDisplayPoweredByUppy: false,
-            closeModalOnClickOutside: true,
-            note: kiwiApi.state.setting('fileuploader.note'),
-        })
+        ...uppyOptions,
+    }
+
+    const uppy = Uppy(effectiveUppyOpts)
+        .use(Dashboard, effectiveDashboardOpts)
         .use(Webcam, { target: Dashboard })
-        .use(Tus, {
-            endpoint: kiwiApi.state.setting('fileuploader.server'),
-            chunkSize: 512 * KiB,
-        })
+        .use(Tus, effectiveTusOpts)
         .run()
+
+    handlerContext.uppy = uppy // needs reference to uppy which didn't exist until now
 
     const dashboard = uppy.getPlugin('Dashboard')
 

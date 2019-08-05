@@ -14,6 +14,7 @@ import { closeModalWhenUploadsCompleted } from './handlers/uppy/close-modal-when
 import { shareCompletedUploadUrl } from './handlers/uppy/share-completed-upload-url';
 import { trackFileUploadTarget } from './handlers/uppy/track-file-upload-target';
 import instantiateUppy from './instantiate-uppy'
+import { createPromptUpload } from './prompt-upload'
 import TokenManager from './token-manager'
 import { setDefaultSetting } from './utils/set-default-setting'
 
@@ -42,8 +43,9 @@ kiwi.plugin('fileuploader', function (kiwiApi, log) {
         uploadFileButton,
     })
 
+    const promptUpload = createPromptUpload({ kiwiApi, tokenManager })
     // expose plugin api
-    kiwiApi.fileuploader = { uppy, dashboard }
+    kiwiApi.fileuploader = { uppy, dashboard, promptUpload }
 
     // show uppy modal whenever a file is dragged over the page
     window.addEventListener('dragenter', showDashboardOnDragEnter(kiwiApi, dashboard))
