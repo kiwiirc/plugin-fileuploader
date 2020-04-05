@@ -1,9 +1,8 @@
 package main
 
-// symlink this file into $GOPATH/src/github.com/kiwiirc/webircgateway/plugins
+// symlink or copy this file into your webircgateway/plugins/fileuploader/plugin.go
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/kiwiirc/plugin-fileuploader/server"
@@ -11,11 +10,11 @@ import (
 )
 
 func Start(gateway *webircgateway.Gateway, pluginsQuit *sync.WaitGroup) {
-	fmt.Println("fileuploader-server start")
 	gateway.Log(1, "Starting fileuploader-server plugin. webircgateway version: %s", webircgateway.Version)
 
 	go func() {
 		defer pluginsQuit.Done()
-		server.RunServer(gateway.HttpRouter, "fileuploader.config.toml")
+		s := server.NewRunContext(gateway.HttpRouter, "fileuploader.config.toml")
+		s.Run()
 	}()
 }

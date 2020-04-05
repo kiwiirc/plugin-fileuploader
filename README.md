@@ -35,12 +35,12 @@ Add the following to the webircgateway config:
 
 ```ini
 [plugins]
-plugins/fileuploader-server.go.so
+plugins/fileuploader.so
 ```
 
 Adjust `BasePath` and `CorsOrigins` as needed in `fileuploader.config.toml`.
 
-Create a symlink to `plugin-fileuploader/webircgateway-plugin/fileuploader-server.go` in `webircgateway/plugins/`.
+Create a symlink to `plugin-fileuploader/webircgateway-plugin/fileuploader-server.go` in `webircgateway/plugins/fileuploader/plugin.go`.
 
 Run `make` in the `webircgateway/` folder to build the plugin.
 
