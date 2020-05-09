@@ -1,5 +1,6 @@
 const path = require('path');
 const VueLoaderPlugin = require('vue-loader/lib/plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const CompressionPlugin = require('compression-webpack-plugin');
 const BrotliPlugin = require('brotli-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
@@ -53,6 +54,13 @@ module.exports = {
             minRatio: 0.8,
             deleteOriginalAssets: false,
         }),
+        new CopyWebpackPlugin([
+            {
+                from: path.resolve(__dirname, './node_modules/@uppy/locales/lib'),
+                to: 'plugin-fileuploader/locales/uppy/',
+                ignore: ['*.map']
+            }
+        ])
     ],
     devtool: 'source-map',
     devServer: {
@@ -61,6 +69,10 @@ module.exports = {
         compress: true,
         host: process.env.HOST || 'localhost',
         port: process.env.PORT || 41040,
+        headers: {
+			// required for loading locales with XMLHttpRequest
+            "Access-Control-Allow-Origin": "*",
+        },
     },
     optimization: {
         minimize: true,

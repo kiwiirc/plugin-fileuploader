@@ -17,6 +17,14 @@ import TokenManager from './token-manager';
 const KiB = 2 ** 10
 const MiB = 2 ** 20
 
+let scriptPath;
+
+(function() {
+    const scriptElements = document.getElementsByTagName('script');
+    const thisScriptSrc = scriptElements[scriptElements.length - 1].src;
+    scriptPath = thisScriptSrc.substr(0, thisScriptSrc.lastIndexOf( '/' ) + 1);
+})();
+
 function getValidUploadTarget() {
     const buffer = kiwi.state.getActiveBuffer()
     const isValidTarget = buffer && (buffer.isChannel() || buffer.isQuery())
@@ -134,23 +142,33 @@ kiwi.plugin('fileuploader', function (kiwi, log) {
     const dashboard = uppy.getPlugin('Dashboard')
 
     function loadLocale(_lang) {
-        try {
-            let lang = (_lang ? _lang : kiwi.i18n.language).split('-')
-            let langUppy = lang[0] + '_' + lang[1].toUpperCase()
-            import(
-                /* webpackMode: "eager" */
-                `@uppy/locales/lib/${langUppy}.js`
-            ).then(locale => {
-                setLocale(locale)
-            });
-        } catch (e) {
-            import(
-                /* webpackMode: "eager" */
-                `@uppy/locales/lib/en_US.js`
-            ).then(locale => {
-                setLocale(locale)
-            });
+        let lang = (_lang ? _lang : kiwi.i18n.language).split('-');
+        if (lang.length !== 2) {
+            setDefaultLocale();
+            return;
         }
+        let langUppy = lang[0] + '_' + lang[1].toUpperCase();
+
+        let xhttp = new XMLHttpRequest();
+        xhttp.onload = (event) => {
+            if (xhttp.status !== 200) {
+                // Failed to load the locale
+                setDefaultLocale();
+                return;
+            }
+            setLocale(eval(xhttp.responseText));
+        };
+        xhttp.open('GET', scriptPath + 'plugin-fileuploader/locales/uppy/' + langUppy + '.js');
+        xhttp.send();
+    }
+
+    function setDefaultLocale() {
+        import(
+            /* webpackMode: "eager" */
+            `@uppy/locales/lib/en_US.js`
+        ).then(locale => {
+            setLocale(locale)
+        });
     }
 
     function setLocale(locale) {
