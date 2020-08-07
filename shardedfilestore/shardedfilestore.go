@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql" // register mysql driver
@@ -181,9 +180,13 @@ func RemoveWithDirs(path string, basePath string) (err error) {
 		return fmt.Errorf("Path %#v is not prefixed by basepath %#v", path, basePath)
 	}
 
-	err = os.Remove(path)
+	if _, err := os.Stat(path); err == nil {
+		err = os.Remove(path)
+	} else if os.IsNotExist(err) {
+		return nil
+	}
 	if err != nil {
-		return
+		return err
 	}
 
 	parent := path
@@ -196,13 +199,12 @@ func RemoveWithDirs(path string, basePath string) (err error) {
 		if !strings.HasPrefix(parentAbs, absBase) || parentAbs == absBase {
 			return err
 		}
-		err = os.Remove(parent)
+
+		empty, err := isDirEmpty(parent);
+		if empty {
+			err = os.Remove(parent)
+		}
 		if err != nil {
-			if pathErr, ok := err.(*os.PathError); ok {
-				if pathErr.Err == syscall.ENOTEMPTY {
-					return nil
-				}
-			}
 			return err
 		}
 	}
@@ -453,4 +455,18 @@ func (store *ShardedFileStore) hashFile(id string) ([]byte, error) {
 	}
 
 	return h.Sum(nil), nil
+}
+
+func isDirEmpty(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	_, err = f.Readdirnames(1)
+    if err == io.EOF {
+        return true, nil
+    }
+    return false, err
 }
