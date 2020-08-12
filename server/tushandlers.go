@@ -17,8 +17,8 @@ import (
 	"github.com/kiwiirc/plugin-fileuploader/events"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
-	"github.com/tus/tusd"
 	"github.com/tus/tusd/cmd/tusd/cli/hooks"
+	tusd "github.com/tus/tusd/pkg/handler"
 )
 
 func routePrefixFromBasePath(basePath string) (string, error) {
@@ -110,18 +110,15 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 		rg.DELETE(":id", gin.WrapF(handler.DelFile))
 	}
 
-	// GET handler requires the GetReader() method
-	if config.StoreComposer.UsesGetReader {
-		getFile := gin.WrapF(handler.GetFile)
-		rg.GET(":id", getFile)
-		rg.GET(":id/:filename", func(c *gin.Context) {
-			// rewrite request path to ":id" route pattern
-			c.Request.URL.Path = path.Join(routePrefix, url.PathEscape(c.Param("id")))
+	getFile := gin.WrapF(handler.GetFile)
+	rg.GET(":id", getFile)
+	rg.GET(":id/:filename", func(c *gin.Context) {
+		// rewrite request path to ":id" route pattern
+		c.Request.URL.Path = path.Join(routePrefix, url.PathEscape(c.Param("id")))
 
-			// call the normal handler
-			getFile(c)
-		})
-	}
+		// call the normal handler
+		getFile(c)
+	})
 
 	return nil
 }

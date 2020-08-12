@@ -4,8 +4,11 @@
 package shardedfilestore
 
 import (
+	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,13 +19,11 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql" // register mysql driver
-	"github.com/kiwiirc/plugin-fileuploader/db"
-	_ "github.com/mattn/go-sqlite3" // register SQL driver
-	"github.com/rs/zerolog"
-	lockfile "gopkg.in/Acconut/lockfile.v1"
+	_ "github.com/mattn/go-sqlite3"    // register SQL driver
 
-	"github.com/tus/tusd"
-	"github.com/tus/tusd/uid"
+	"github.com/kiwiirc/plugin-fileuploader/db"
+	"github.com/rs/zerolog"
+	"github.com/tus/tusd/pkg/handler"
 )
 
 var defaultFilePerm = os.FileMode(0664)
@@ -42,7 +43,6 @@ type ShardedFileStore struct {
 // whether the path exists, use os.MkdirAll to ensure.
 // In addition, a locking mechanism is provided.
 func New(basePath string, prefixShardLayers int, dbConnection *db.DatabaseConnection, log *zerolog.Logger) *ShardedFileStore {
-
 	store := &ShardedFileStore{
 		BasePath:          basePath,
 		PrefixShardLayers: prefixShardLayers,
@@ -55,27 +55,32 @@ func New(basePath string, prefixShardLayers int, dbConnection *db.DatabaseConnec
 
 // UseIn sets this store as the core data store in the passed composer and adds
 // all possible extension to it.
-func (store *ShardedFileStore) UseIn(composer *tusd.StoreComposer) {
+func (store ShardedFileStore) UseIn(composer *handler.StoreComposer) {
 	composer.UseCore(store)
-	composer.UseGetReader(store)
 	composer.UseTerminater(store)
-	composer.UseLocker(store)
 	composer.UseConcater(store)
-	composer.UseFinisher(store)
+	composer.UseLengthDeferrer(store)
 }
 
-func (store *ShardedFileStore) NewUpload(info tusd.FileInfo) (id string, err error) {
-	id = uid.Uid()
+func (store ShardedFileStore) NewUpload(ctx context.Context, info handler.FileInfo) (handler.Upload, error) {
+	var err error
+
+	id := Uid()
+	binPath := store.binPath(id)
 	info.ID = id
+	info.Storage = map[string]string{
+		"Type": "filestore",
+		"Path": binPath,
+	}
 
 	// Create the directory stucture if needed
 	err = os.MkdirAll(store.metaDir(id), defaultDirectoryPerm)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	err = os.MkdirAll(store.incompleteBinDir(), defaultDirectoryPerm)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// create record in uploads table
@@ -88,54 +93,229 @@ func (store *ShardedFileStore) NewUpload(info tusd.FileInfo) (id string, err err
 		)
 	}
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Create .bin file with no content
 	file, err := os.OpenFile(store.binPath(id), os.O_CREATE|os.O_WRONLY, defaultFilePerm)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer file.Close()
 
+	upload := &fileUpload{
+		info:     info,
+		store:    store,
+		infoPath: store.infoPath(id),
+		binPath:  store.binPath(id),
+	}
+
 	// writeInfo creates the file by itself if necessary
-	err = store.writeInfo(id, info)
-	return
+	err = upload.writeInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	return upload, nil
 }
 
-func (store *ShardedFileStore) WriteChunk(id string, offset int64, src io.Reader) (int64, error) {
-	file, err := os.OpenFile(store.binPath(id), os.O_WRONLY|os.O_APPEND, defaultFilePerm)
+func (store ShardedFileStore) GetUpload(ctx context.Context, id string) (handler.Upload, error) {
+	info := handler.FileInfo{}
+	data, err := ioutil.ReadFile(store.infoPath(id))
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &info); err != nil {
+		return nil, err
+	}
+
+	binPath := store.binPath(id)
+	infoPath := store.infoPath(id)
+	stat, err := os.Stat(binPath)
+	if err != nil {
+		return nil, err
+	}
+
+	info.Offset = stat.Size()
+
+	return &fileUpload{
+		info:     info,
+		binPath:  binPath,
+		store:    store,
+		infoPath: infoPath,
+	}, nil
+}
+
+func (store ShardedFileStore) AsTerminatableUpload(upload handler.Upload) handler.TerminatableUpload {
+	return upload.(*fileUpload)
+}
+
+func (store ShardedFileStore) AsLengthDeclarableUpload(upload handler.Upload) handler.LengthDeclarableUpload {
+	return upload.(*fileUpload)
+}
+
+func (store ShardedFileStore) AsConcatableUpload(upload handler.Upload) handler.ConcatableUpload {
+	return upload.(*fileUpload)
+}
+
+// binPath returns the path to the file storing the binary data.
+func (store ShardedFileStore) binPath(id string) string {
+	hashBytes, isFinal, err := store.lookupHash(id)
+	if err != nil {
+		store.log.Fatal().Err(err).Msg("Could not look up hash")
+	}
+
+	if !isFinal {
+		return store.incompleteBinPath(id)
+	}
+
+	return store.completeBinPath(hashBytes)
+}
+
+// infoPath returns the path to the .info file storing the upload's metadata.
+func (store *ShardedFileStore) infoPath(id string) string {
+	// <base-path>/meta/<id-shards>/<id>.info
+	return filepath.Join(store.metaDir(id), id+".info")
+}
+
+type fileUpload struct {
+	// info stores the current information about the upload
+	info handler.FileInfo
+	// store the fileupload's store
+	store ShardedFileStore
+	// infoPath is the path to the .info file
+	infoPath string
+	// binPath is the path to the binary file (which has no extension)
+	binPath string
+}
+
+func (upload *fileUpload) GetInfo(ctx context.Context) (handler.FileInfo, error) {
+	return upload.info, nil
+}
+
+func (upload *fileUpload) WriteChunk(ctx context.Context, offset int64, src io.Reader) (int64, error) {
+	file, err := os.OpenFile(upload.binPath, os.O_WRONLY|os.O_APPEND, defaultFilePerm)
 	if err != nil {
 		return 0, err
 	}
 	defer file.Close()
 
 	n, err := io.Copy(file, src)
+
+	// If the HTTP PATCH request gets interrupted in the middle (e.g. because
+	// the user wants to pause the upload), Go's net/http returns an io.ErrUnexpectedEOF.
+	// However, for ShardedFileStore it's not important whether the stream has ended
+	// on purpose or accidentally.
+	if err == io.ErrUnexpectedEOF {
+		err = nil
+	}
+
+	upload.info.Offset += n
+
 	return n, err
 }
 
-func (store *ShardedFileStore) GetInfo(id string) (tusd.FileInfo, error) {
-	info := tusd.FileInfo{}
-	data, err := ioutil.ReadFile(store.infoPath(id))
-	if err != nil {
-		return info, err
-	}
-	if err := json.Unmarshal(data, &info); err != nil {
-		return info, err
-	}
-
-	stat, err := os.Stat(store.binPath(id))
-	if err != nil {
-		return info, err
-	}
-
-	info.Offset = stat.Size()
-
-	return info, nil
+func (upload *fileUpload) GetReader(ctx context.Context) (io.Reader, error) {
+	return os.Open(upload.binPath)
 }
 
-func (store *ShardedFileStore) GetReader(id string) (io.Reader, error) {
-	return os.Open(store.binPath(id))
+func (upload *fileUpload) Terminate(ctx context.Context) error {
+	return upload.store.Terminate(upload.info.ID)
+}
+
+func (upload *fileUpload) ConcatUploads(ctx context.Context, uploads []handler.Upload) (err error) {
+	file, err := os.OpenFile(upload.binPath, os.O_WRONLY|os.O_APPEND, defaultFilePerm)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	for _, partialUpload := range uploads {
+		fileUpload := partialUpload.(*fileUpload)
+
+		src, err := os.Open(fileUpload.binPath)
+		if err != nil {
+			return err
+		}
+
+		if _, err := io.Copy(file, src); err != nil {
+			return err
+		}
+	}
+
+	return
+}
+
+func (upload *fileUpload) DeclareLength(ctx context.Context, length int64) error {
+	upload.info.Size = length
+	upload.info.SizeIsDeferred = false
+	return upload.writeInfo()
+}
+
+// writeInfo updates the entire information. Everything will be overwritten.
+func (upload *fileUpload) writeInfo() error {
+	data, err := json.Marshal(upload.info)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(upload.infoPath, data, defaultFilePerm)
+}
+
+func (upload *fileUpload) FinishUpload(ctx context.Context) error {
+	upload.store.log.Debug().
+		Str("event", "upload_finished").
+		Str("id", upload.info.ID).Msg("Finishing upload")
+
+	// calculate hash
+	hash, err := upload.store.hashFile(upload.info.ID)
+	if err != nil {
+		return err
+	}
+
+	// update hash in uploads table
+	err = db.UpdateRow(upload.store.DBConn.DB, `
+		UPDATE uploads
+		SET sha256sum = ?
+		WHERE id = ?
+	`, hash, upload.info.ID)
+	if err != nil {
+		return err
+	}
+
+	// relocate file
+	newPath := upload.store.completeBinPath(hash)
+	os.MkdirAll(filepath.Dir(newPath), defaultDirectoryPerm)
+	oldPath := upload.store.incompleteBinPath(upload.info.ID)
+
+	err = os.Rename(oldPath, newPath)
+	if err != nil {
+		upload.store.log.Error().
+			Err(err).
+			Str("oldPath", oldPath).
+			Str("newPath", newPath).
+			Msg("Failed to rename")
+	}
+
+	if err == nil {
+		upload.info.Storage["Path"] = newPath
+		err = upload.writeInfo()
+	}
+
+	return err
+}
+
+// ADDED FUNCTIONS
+
+// taken from https://github.com/tus/tusd/blob/42bfe35457f8bfc79a0af40a9f51c8112903737e/internal/uid/uid.go
+func Uid() string {
+	id := make([]byte, 16)
+	_, err := io.ReadFull(rand.Reader, id)
+	if err != nil {
+		// This is probably an appropriate way to handle errors from our source
+		// for random bits.
+		panic(err)
+	}
+	return hex.EncodeToString(id)
 }
 
 func (store *ShardedFileStore) Terminate(id string) error {
@@ -173,147 +353,6 @@ func (store *ShardedFileStore) Terminate(id string) error {
 	}
 
 	return nil
-}
-
-func (store *ShardedFileStore) ConcatUploads(dest string, uploads []string) (err error) {
-	file, err := os.OpenFile(store.binPath(dest), os.O_WRONLY|os.O_APPEND, defaultFilePerm)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	for _, id := range uploads {
-		src, err := store.GetReader(id)
-		if err != nil {
-			return err
-		}
-
-		if _, err := io.Copy(file, src); err != nil {
-			return err
-		}
-	}
-
-	return
-}
-
-func (store *ShardedFileStore) LockUpload(id string) error {
-	lock, err := store.newLock(id)
-	if err != nil {
-		return err
-	}
-
-	err = lock.TryLock()
-	if err == lockfile.ErrBusy {
-		return tusd.ErrFileLocked
-	}
-
-	return err
-}
-
-func (store *ShardedFileStore) UnlockUpload(id string) error {
-	lock, err := store.newLock(id)
-	if err != nil {
-		return err
-	}
-
-	err = lock.Unlock()
-
-	// A "no such file or directory" will be returned if no lockfile was found.
-	// Since this means that the file has never been locked, we drop the error
-	// and continue as if nothing happened.
-	if os.IsNotExist(err) {
-		err = nil
-	}
-
-	return err
-}
-
-// newLock contructs a new Lockfile instance.
-func (store *ShardedFileStore) newLock(id string) (lockfile.Lockfile, error) {
-	path, err := filepath.Abs(store.lockPath(id))
-	if err != nil {
-		return lockfile.Lockfile(""), err
-	}
-
-	// We use Lockfile directly instead of lockfile.New to bypass the unnecessary
-	// check whether the provided path is absolute since we just resolved it
-	// on our own.
-	return lockfile.Lockfile(path), nil
-}
-
-// binPath returns the path to the .bin storing the binary data.
-func (store *ShardedFileStore) binPath(id string) string {
-	hashBytes, isFinal, err := store.lookupHash(id)
-	if err != nil {
-		store.log.Fatal().Err(err).Msg("Could not look up hash")
-	}
-
-	if !isFinal {
-		return store.incompleteBinPath(id)
-	}
-
-	return store.completeBinPath(hashBytes)
-}
-
-// infoPath returns the path to the .info file storing the upload's metadata.
-func (store *ShardedFileStore) infoPath(id string) string {
-	// <base-path>/meta/<id-shards>/<id>.info
-	return filepath.Join(store.metaDir(id), id+".info")
-}
-
-// writeInfo updates the entire information. Everything will be overwritten.
-func (store *ShardedFileStore) writeInfo(id string, info tusd.FileInfo) error {
-	data, err := json.Marshal(info)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(store.infoPath(id), data, defaultFilePerm)
-}
-
-//
-// ADDED FUNCTIONS
-//
-
-// Close frees the database connection pool held within ShardedFileStore
-func (store *ShardedFileStore) Close() error {
-	return store.DBConn.DB.Close()
-}
-
-// FinishUpload deduplicates the upload by its cryptographic hash
-func (store *ShardedFileStore) FinishUpload(id string) error {
-	store.log.Debug().
-		Str("event", "upload_finished").
-		Str("id", id).Msg("Finishing upload")
-
-	// calculate hash
-	hash, err := store.hashFile(id)
-	if err != nil {
-		return err
-	}
-
-	// update hash in uploads table
-	err = db.UpdateRow(store.DBConn.DB, `
-		UPDATE uploads
-		SET sha256sum = ?
-		WHERE id = ?
-	`, hash, id)
-	if err != nil {
-		return err
-	}
-
-	// relocate file
-	newPath := store.completeBinPath(hash)
-	os.MkdirAll(filepath.Dir(newPath), defaultDirectoryPerm)
-	oldPath := store.incompleteBinPath(id)
-	err = os.Rename(oldPath, newPath)
-	if err != nil {
-		store.log.Error().
-			Err(err).
-			Str("oldPath", oldPath).
-			Str("newPath", newPath).
-			Msg("Failed to rename")
-	}
-	return err
 }
 
 func (store *ShardedFileStore) hashFile(id string) ([]byte, error) {
