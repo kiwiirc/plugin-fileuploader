@@ -40,6 +40,7 @@ export default function instantiateUppy({
         onBeforeUpload: handleBeforeUpload,
         restrictions: {
             maxFileSize: kiwiApi.state.setting('fileuploader.maxFileSize'),
+            allowedFileTypes: kiwiApi.state.setting('fileuploader.allowedFileTypes'),
         },
         ...uppyOptions,
     }

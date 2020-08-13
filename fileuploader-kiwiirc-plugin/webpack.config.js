@@ -4,6 +4,7 @@ const CompressionPlugin = require('compression-webpack-plugin')
 const BrotliPlugin = require('brotli-webpack-plugin')
 const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 
+const makeSourceMap = process.argv.indexOf('--srcmap') > -1;
 const shouldCompress = /\.(js|css|html|svg)(\.map)?$/
 
 module.exports = {
@@ -55,7 +56,7 @@ module.exports = {
             deleteOriginalAssets: false,
         }),
     ],
-    devtool: 'source-map',
+    devtool: makeSourceMap ? 'source-map' : '',
     devServer: {
         filename: 'plugin-fileuploader.js',
         contentBase: path.join(__dirname, 'dist'),
@@ -67,6 +68,8 @@ module.exports = {
         minimize: true,
     },
     performance: {
+        maxAssetSize: 700000,
+        maxEntrypointSize: 700000,
         assetFilter: assetFilename =>
           !assetFilename.match(/\.map(\.(gz|br))?$/),
     },

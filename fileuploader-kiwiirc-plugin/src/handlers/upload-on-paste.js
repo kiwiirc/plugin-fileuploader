@@ -49,11 +49,13 @@ export function uploadOnPaste(kiwiApi, uppy, dashboard) {
 
                     if (shouldAutoUpload) {
                         uppy.upload()
+                    } else {
+                        dashboard.openModal()
                     }
-
-                    dashboard.openModal()
                 }
             }
+
+            return
         }
 
         // ensure a file has been pasted
