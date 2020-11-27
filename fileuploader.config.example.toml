@@ -45,6 +45,14 @@ MaxAge = "24h" # 1 day
 IdentifiedMaxAge = "168h" # 1 week
 CheckInterval = "5m"
 
+[Embed]
+TemplatePath = "templates/embed.html"
+CacheMaxAge = "1h"
+CacheCleanInterval = "15m"
+ImageCachePath = "image-cache"
+ImageCacheMaxSize = 1073741824
+
+
 # If EXTJWT is supported by the gateway or network, a validated token with an account present (when
 # the user is authenticated to an irc services account) will use the IdentifiedMaxAge setting above
 # instead of the base MaxAge.

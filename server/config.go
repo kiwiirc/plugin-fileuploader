@@ -45,6 +45,15 @@ type Config struct {
 	}
 	JwtSecretsByIssuer map[string]string
 	Loggers            []LoggerConfig
+
+	// Embed Provider
+	Embed struct {
+		TemplatePath       string
+		CacheMaxAge        duration
+		CacheCleanInterval duration
+		ImageCachePath     string
+		ImageCacheMaxSize  uint64
+	}
 }
 
 func NewConfig() *Config {
