@@ -21,8 +21,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dyatlov/go-oembed/oembed"
 	"github.com/gin-gonic/gin"
-	"github.com/gregjones/httpcache/diskcache"
-	"github.com/peterbourgon/diskv"
 	"willnorris.com/go/imageproxy"
 )
 
@@ -72,7 +70,7 @@ func (serv *UploadServer) registerEmbedHandlers(r *gin.Engine, cfg Config) error
 	rg.GET("", handleEmbed)
 
 	// Attach imageproxy
-	cache := diskCache(cfg.Embed.ImageCachePath, cfg.Embed.ImageCacheMaxSize)
+	cache := serv.diskCache()
 	imgProxy = imageproxy.NewProxy(nil, cache)
 
 	ic := r.Group("/image-cache/*id")
@@ -83,18 +81,20 @@ func (serv *UploadServer) registerEmbedHandlers(r *gin.Engine, cfg Config) error
 func handleImageCache(c *gin.Context) {
 	r := c.Request
 	r.URL.Path = strings.Replace(r.URL.Path, "/image-cache", "", -1)
-	spew.Dump(r.URL.Path)
 	imgProxy.ServeHTTP(c.Writer, c.Request)
+	fmt.Println("------------------------------------------------------")
 }
 
-func diskCache(path string, maxSize uint64) *diskcache.Cache {
-	d := diskv.New(diskv.Options{
-		BasePath:     path,
-		CacheSizeMax: maxSize,
-		// For file "c0ffee", store file as "c0/ff/c0ffee"
-		Transform: func(s string) []string { return []string{s[0:2], s[2:4]} },
-	})
-	return diskcache.NewWithDiskv(d)
+func (serv *UploadServer) diskCache() *ImageProxyCache {
+	// d := diskv.New(diskv.Options{
+	// 	BasePath:     path,
+	// 	CacheSizeMax: maxSize,
+	// 	// For file "c0ffee", store file as "c0/ff/c0ffee"
+	// 	Transform: func(s string) []string { return []string{s[0:2], s[2:4]} },
+	// })
+	// return diskcache.NewWithDiskv(d)
+	d := NewImageProxyCache(serv.store, serv.log)
+	return d
 }
 
 func handleEmbed(c *gin.Context) {

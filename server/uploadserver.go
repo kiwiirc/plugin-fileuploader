@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"sync"
 
@@ -18,6 +19,7 @@ import (
 type UploadServer struct {
 	DBConn *db.DatabaseConnection
 	Router *gin.Engine
+	ctx    *RunContext
 
 	cfg                 Config
 	log                 *zerolog.Logger
@@ -109,7 +111,7 @@ func (serv *UploadServer) Shutdown() {
 
 	// wait for all requests to finish
 	if serv.httpServer != nil {
-		serv.httpServer.Shutdown(nil)
+		serv.httpServer.Shutdown(context.TODO())
 	}
 
 	// stop running FileStore GC cycles
