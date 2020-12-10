@@ -7,7 +7,6 @@ require (
 	github.com/OneOfOne/xxhash v1.2.7 // indirect
 	github.com/bmizerany/pat v0.0.0-20170815010413-6226ea591a40 // indirect
 	github.com/c2h5oh/datasize v0.0.0-20171227191756-4eba002a5eae
-	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dyatlov/go-oembed v0.0.0-20191103150536-a57c85b3b37c
 	github.com/gin-contrib/sse v0.1.0 // indirect

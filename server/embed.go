@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -18,9 +17,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/dyatlov/go-oembed/oembed"
 	"github.com/gin-gonic/gin"
+	"github.com/kiwiirc/plugin-fileuploader/noembed"
 	"willnorris.com/go/imageproxy"
 )
 
@@ -31,73 +30,167 @@ type cacheItem struct {
 	wg      sync.WaitGroup
 }
 
+type imgWaiterItem struct {
+	url     string
+	status  int
+	created int64
+	wg      sync.WaitGroup
+}
+
 // HTML template
 var template string
 var templateLock sync.RWMutex
 
 // In memory HTML cache
 var cache = make(map[string]*cacheItem)
-var cacheLock sync.Mutex
+var cacheMutex sync.Mutex
 var cacheTicker *time.Ticker
 
-var embed *oembed.Oembed
+// Image waiter
+var imgWaiter = make(map[string]*imgWaiterItem)
+var imgWaiterMutex sync.Mutex
 
+var oEmbed *oembed.Oembed
+var noEmbed *noembed.NoEmbed
 var imgProxy *imageproxy.Proxy
 
-// Used to detect possible image urls after after failed oembed match
+// Used to detect possible image urls
 var isImage = regexp.MustCompile(`\.(jpe?g|png|gifv?)$`)
 
 func (serv *UploadServer) registerEmbedHandlers(r *gin.Engine, cfg Config) error {
-	data, err := getProviders(false)
+	serv.log.Info().
+		Msg("Starting embed handlers")
+
+	// Prepare oEmbed provider
+	oembedJSON, err := getProvidersCached("https://oembed.com/providers.json", "oembed-providers.json", false)
 	if err != nil {
+		serv.log.Error().
+			Err(err).
+			Msg("Failed to get oembed providers json")
 		return err
 	}
-	embed = oembed.NewOembed()
-	embed.ParseProviders(bytes.NewReader(*data))
-
-	// Start the cleanup ticker
-	startCleanupTicker(
-		cfg.Embed.CacheCleanInterval.Duration,
-		cfg.Embed.CacheMaxAge.Duration,
-	)
-
-	if err := loadTemplate(cfg.Embed.TemplatePath); err != nil {
-		log.Println("Failed to load template: " + err.Error())
-		return nil
+	oEmbed = oembed.NewOembed()
+	err = oEmbed.ParseProviders(bytes.NewReader(*oembedJSON))
+	if err != nil {
+		serv.log.Error().
+			Err(err).
+			Msg("Failed to parse oembed providers json")
+		return err
 	}
 
+	// Prepare noEmbed provider
+	noembedJSON, err := getProvidersCached("https://noembed.com/providers", "noembed-providers.json", false)
+	if err != nil {
+		serv.log.Error().
+			Err(err).
+			Msg("Failed to get noembed providers json")
+		return err
+	}
+	noEmbed = noembed.New()
+	err = noEmbed.ParseProviders(bytes.NewReader(*noembedJSON))
+	if err != nil {
+		serv.log.Error().
+			Err(err).
+			Msg("Failed to parse noembed providers json")
+		return err
+	}
+
+	// Check config defaults
+	cacheCleanInterval := cfg.Embed.CacheCleanInterval.Duration
+	if cacheCleanInterval == time.Duration(0) {
+		cacheCleanInterval, _ = time.ParseDuration("15m")
+	}
+
+	cacheMaxAge := cfg.Embed.CacheMaxAge.Duration
+	if cacheMaxAge == time.Duration(0) {
+		cacheMaxAge, _ = time.ParseDuration("1h")
+	}
+
+	templatePath := cfg.Embed.TemplatePath
+	if templatePath == "" {
+		templatePath = "templates/embed.html"
+	}
+
+	// Start the cleanup ticker
+	serv.startCleanupTicker(
+		cacheCleanInterval,
+		cacheMaxAge,
+	)
+
+	// Load embed html template
+	if err := loadTemplate(templatePath); err != nil {
+		serv.log.Error().
+			Err(err).
+			Msg("Failed to load template")
+		return err
+	}
+
+	// Register our handler
 	rg := r.Group("/embed")
-	rg.GET("", handleEmbed)
+	rg.GET("", serv.handleEmbed)
+
+	// Create imageproxy and provide interface to shardedfilestore
+	imgCache := NewImageProxyCache(serv.store, serv.log)
+	imgProxy = imageproxy.NewProxy(nil, imgCache)
 
 	// Attach imageproxy
-	cache := serv.diskCache()
-	imgProxy = imageproxy.NewProxy(nil, cache)
-
 	ic := r.Group("/image-cache/*id")
-	ic.GET("", handleImageCache)
+	ic.GET("", serv.handleImageCache)
+
 	return nil
 }
 
-func handleImageCache(c *gin.Context) {
+func (serv *UploadServer) handleImageCache(c *gin.Context) {
 	r := c.Request
 	r.URL.Path = strings.Replace(r.URL.Path, "/image-cache", "", -1)
-	imgProxy.ServeHTTP(c.Writer, c.Request)
-	fmt.Println("------------------------------------------------------")
+
+	hash := getHash(r.URL.Path)
+
+	serv.log.Debug().
+		Msgf("Image request\n\turl: %s\n\thash: %s", r.URL.Path, hash)
+
+	imgWaiterMutex.Lock()
+	item, ok := imgWaiter[hash]
+	if !ok {
+		// This is the first client to request this url
+		// create a waiter item and add it to the map
+		item = &imgWaiterItem{
+			url:     r.URL.Path,
+			created: time.Now().Unix(),
+		}
+		// Other requests will wait on this waitgroup once the mutex is unlocked
+		item.wg.Add(1)
+		imgWaiter[hash] = item
+
+		// Other requests are currently waiting for this mutex
+		imgWaiterMutex.Unlock()
+
+		// Pass this request to the image proxy
+		imgProxy.ServeHTTP(c.Writer, c.Request)
+
+		// Image proxy is done, store resulting status
+		item.status = c.Writer.Status()
+
+		// Ready for other clients to access this url
+		item.wg.Done()
+	} else {
+		// Not the first client to request this url
+		// We no longer need the mutex as we will use the waitgroup
+		imgWaiterMutex.Unlock()
+		item.wg.Wait()
+
+		// Waitgroup is complete check if the first request was successful
+		if item.status == 200 {
+			// The first request was successful pass this request to the image proxy
+			imgProxy.ServeHTTP(c.Writer, c.Request)
+		} else {
+			// First request failed return its status code to the client
+			c.Status(item.status)
+		}
+	}
 }
 
-func (serv *UploadServer) diskCache() *ImageProxyCache {
-	// d := diskv.New(diskv.Options{
-	// 	BasePath:     path,
-	// 	CacheSizeMax: maxSize,
-	// 	// For file "c0ffee", store file as "c0/ff/c0ffee"
-	// 	Transform: func(s string) []string { return []string{s[0:2], s[2:4]} },
-	// })
-	// return diskcache.NewWithDiskv(d)
-	d := NewImageProxyCache(serv.store, serv.log)
-	return d
-}
-
-func handleEmbed(c *gin.Context) {
+func (serv *UploadServer) handleEmbed(c *gin.Context) {
 	queryURL := c.Query("url")
 	if !isValidURL(queryURL) {
 		c.AbortWithStatus(http.StatusBadRequest)
@@ -126,27 +219,35 @@ func handleEmbed(c *gin.Context) {
 
 	hash := getHash(queryURL)
 
-	spew.Dump(queryURL, center, height, width)
+	serv.log.Debug().
+		Msgf("Embed request\n\turl: %s\n\thash: %s", queryURL, hash)
 
-	cacheLock.Lock()
+	cacheMutex.Lock()
 	item, ok := cache[hash]
 	if !ok {
 		// Cache miss create new cache item
+		serv.log.Debug().
+			Msgf("HTML cache miss")
 		item = &cacheItem{
 			url:     queryURL,
 			html:    "",
 			created: time.Now().Unix(),
 		}
 
-		// Add to waitgroup so other clients can wait for the oEmbed result
+		// Add to waitgroup so other clients can wait for the embed result
 		item.wg.Add(1)
 		cache[hash] = item
 
 		// Item added to cache, unlock so other requests can see the new item
-		cacheLock.Unlock()
+		cacheMutex.Unlock()
+
+		// Check if the url looks like an image
+		if isImage.MatchString(queryURL) {
+			item.html = getImageHTML(c, queryURL, height)
+		}
 
 		// Attempt to fetch oEmbed data
-		embedItem := embed.FindItem(queryURL)
+		embedItem := oEmbed.FindItem(queryURL)
 		if embedItem != nil {
 			options := oembed.Options{
 				URL:       queryURL,
@@ -155,27 +256,36 @@ func handleEmbed(c *gin.Context) {
 			}
 			info, err := embedItem.FetchOembed(options)
 			if err != nil {
-				// An unexpected error occurred
-				fmt.Printf("An error occured: %s\n", err.Error())
+				serv.log.Error().
+					Err(err).
+					Msg("Unexpected error in oEmbed")
 			} else if info.Status >= 300 {
-				// oEmbed returned an error status
-				fmt.Printf("Response status code is: %d\n", info.Status)
+				// oEmbed returned a bad status code
+				serv.log.Debug().
+					Msgf("Bad response code from oEmbed: %d", info.Status)
 			} else if info.HTML != "" {
 				// oEmbed returned embedable html
-				fmt.Printf("Oembed info:\n%s\n", info)
+				serv.log.Debug().
+					Msgf("oEmbed info:\n%s", info)
 				item.html = info.HTML
 			} else if info.Type == "photo" {
 				// oEmbed returned a photo type the url should be an image
-				fmt.Println("type photo " + info.URL)
+				serv.log.Debug().
+					Msgf("oEmbed info:\n%s", info)
 				item.html = getImageHTML(c, info.URL, height)
-			} else {
-				spew.Dump(info)
 			}
 		}
 
-		// oEmbed did not return any html, maybe the url is direct to an image
-		if item.html == "" && isImage.MatchString(queryURL) {
-			item.html = getImageHTML(c, queryURL, height)
+		// No embedable html, time to try noembed
+		if item.html == "" {
+			noEmbedResp, err := noEmbed.Get(queryURL)
+			if err != nil {
+				serv.log.Error().
+					Err(err).
+					Msg("Unexpected error in noEmbed")
+			} else {
+				item.html = noEmbedResp.HTML
+			}
 		}
 
 		// Still no html send an error to the parent
@@ -186,9 +296,10 @@ func handleEmbed(c *gin.Context) {
 		// Decrease the waitgroup so other requests can complete
 		item.wg.Done()
 	} else {
-		log.Printf("Cache HIT")
 		// Cache hit unlock the cache
-		cacheLock.Unlock()
+		serv.log.Debug().
+			Msg("HTML cache hit")
+		cacheMutex.Unlock()
 	}
 
 	// Wait until the cache item is fulfilled
@@ -206,80 +317,79 @@ func handleEmbed(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(htmlData))
 }
 
-func getProviders(force bool) (*[]byte, error) {
-	log.Println("Getting oEmbed Providers")
-	if _, err := os.Stat("providers.json"); force || os.IsNotExist(err) {
-		resp, err := http.Get("https://oembed.com/providers.json")
+func getProvidersCached(url string, filePath string, force bool) (*[]byte, error) {
+	var err error
+	if _, err = os.Stat(filePath); force || os.IsNotExist(err) {
+		var httpResp *http.Response
+		httpResp, err = http.Get(url)
 		if err != nil {
-			return nil, errors.New("Failed to fetch oEmbed providers: " + err.Error())
+			return nil, errors.New("Failed to fetch providers: " + err.Error())
 		}
-		defer resp.Body.Close()
+		defer httpResp.Body.Close()
 
-		log.Println("Fetched oEmbed Providers")
-
-		data, err := ioutil.ReadAll(resp.Body)
+		var rawJSON []byte
+		rawJSON, err = ioutil.ReadAll(httpResp.Body)
 		if err != nil {
-			return nil, errors.New("Failed to read oEmbed providers: " + err.Error())
+			return nil, errors.New("Failed to read providers: " + err.Error())
 		}
-
-		log.Println("Read oEmbed Providers")
 
 		// Unmarshal to temp interface to ensure valid json
 		var temp interface{}
-		err = json.Unmarshal(data, &temp)
+		err = json.Unmarshal(rawJSON, &temp)
 		if err != nil {
-			return nil, errors.New("Failed to parse oEmbed providers: " + err.Error())
+			return nil, errors.New("Failed to parse providers: " + err.Error())
 		}
 
-		log.Println("Tested oEmbed Providers")
-
 		// Data appears to be valid json open providers file for writing
-		file, err := os.Create("providers.json")
+		var file *os.File
+		file, err = os.Create(filePath)
 		if err != nil {
-			return nil, errors.New("Failed to create oEmbed providers: " + err.Error())
+			return nil, errors.New("Failed to create providers file: " + err.Error())
 		}
 		defer file.Close()
 
-		log.Println("Created oEmbed Providers")
-
 		// Write providers.json
-		_, err = file.Write(data)
+		_, err = file.Write(rawJSON)
 		if err != nil {
-			return nil, errors.New("Failed to write oEmbed providers: " + err.Error())
+			return nil, errors.New("Failed to write providers: " + err.Error())
 		}
 
-		log.Println("Written oEmbed Providers")
-
-		return &data, nil
+		return &rawJSON, nil
+	} else if err != nil {
+		return nil, errors.New("Failed to stat providers file: " + err.Error())
 	}
 
-	// Open existing providers.json
-	file, err := os.Open("providers.json")
+	// Open existing providers file
+	var file *os.File
+	file, err = os.Open(filePath)
 	if err != nil {
-		return nil, errors.New("Failed to open oEmbed providers: " + err.Error())
+		return nil, errors.New("Failed to open providers: " + err.Error())
 	}
 	defer file.Close()
 
-	// Read providers.json data
-	data, err := ioutil.ReadAll(file)
+	// Read existing providers file
+	var rawJSON []byte
+	rawJSON, err = ioutil.ReadAll(file)
 	if err != nil {
-		return nil, errors.New("Failed to read oEmbed providers: " + err.Error())
+		return nil, errors.New("Failed to read providers: " + err.Error())
 	}
 
-	return &data, nil
+	return &rawJSON, nil
 }
 
-func startCleanupTicker(cleanInterval, cacheMaxAge time.Duration) {
+func (serv *UploadServer) startCleanupTicker(cleanInterval, cacheMaxAge time.Duration) {
 	cacheTicker = time.NewTicker(cleanInterval)
 	go func() {
 		for range cacheTicker.C {
-			cleanCache(cacheMaxAge)
+			serv.cleanCache(cacheMaxAge)
 		}
 	}()
 }
 
-func cleanCache(cacheMaxAge time.Duration) {
+func (serv *UploadServer) cleanCache(cacheMaxAge time.Duration) {
 	createdBefore := time.Now().Unix() - int64(cacheMaxAge.Seconds())
+
+	// Find expired items in HTML cache
 	var expired []string
 	for hash, item := range cache {
 		if item.created >= createdBefore {
@@ -288,21 +398,46 @@ func cleanCache(cacheMaxAge time.Duration) {
 		expired = append(expired, hash)
 	}
 
-	if len(expired) == 0 {
-		// Nothing to clean
-		log.Println("No cache items to clean")
-		return
+	// Find expired items in imgWaiter
+	var expiredWaiters []string
+	for hash, item := range imgWaiter {
+		if item.created >= createdBefore {
+			continue
+		}
+		expired = append(expiredWaiters, hash)
 	}
 
-	cacheLock.Lock()
-	for _, hash := range expired {
-		if hash == "" {
-			break
+	// Remove expired items from HTML cache
+	if len(expired) > 0 {
+		serv.log.Debug().
+			Msgf("Cleaning %d item from HTML cache", len(expired))
+
+		cacheMutex.Lock()
+		for _, hash := range expired {
+			if hash == "" {
+				break
+			}
+			log.Println("Deleting cache item: " + hash)
+			delete(cache, hash)
 		}
-		log.Println("Deleting cache item: " + hash)
-		delete(cache, hash)
+		cacheMutex.Unlock()
 	}
-	cacheLock.Unlock()
+
+	// Remove expired items from img waiter
+	if len(expiredWaiters) > 0 {
+		serv.log.Debug().
+			Msgf("Cleaning %d item from img waiter cache", len(expired))
+
+		cacheMutex.Lock()
+		for _, hash := range expiredWaiters {
+			if hash == "" {
+				break
+			}
+			log.Println("Deleting cache item: " + hash)
+			delete(imgWaiter, hash)
+		}
+		cacheMutex.Unlock()
+	}
 }
 
 func loadTemplate(templatePath string) error {

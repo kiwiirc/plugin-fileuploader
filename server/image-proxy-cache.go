@@ -2,10 +2,8 @@ package server
 
 import (
 	"bytes"
-	"fmt"
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 	"github.com/rs/zerolog"
 	"github.com/tus/tusd"
@@ -21,20 +19,20 @@ type ImageProxyCache struct {
 // Get returns the response corresponding to key if present
 func (c *ImageProxyCache) Get(key string) (resp []byte, ok bool) {
 	urlHash := getHash(key)
-	spew.Dump("Get", key, urlHash)
 
 	idInterface, ok := c.urlMap.Load(urlHash)
 	if !ok {
-		fmt.Println("Not in map")
-		fmt.Println("")
+		// Not in map
 		return []byte{}, false
 	}
 	id := idInterface.(string)
 
 	reader, err := c.store.GetReader(id)
 	if err != nil {
-		fmt.Println("No reader")
-		fmt.Println("")
+		// No file to read
+		c.log.Debug().
+			Err(err).
+			Msg("Image missing from shardedfilestore, maybe it was cleaned")
 		c.urlMap.Delete(urlHash)
 		return []byte{}, false
 	}
@@ -42,24 +40,21 @@ func (c *ImageProxyCache) Get(key string) (resp []byte, ok bool) {
 	buffer := new(bytes.Buffer)
 	_, err = buffer.ReadFrom(reader)
 	if err != nil {
-		fmt.Println("Failed read")
-		fmt.Println("")
+		// Read error
+		c.log.Debug().
+			Err(err).
+			Msg("Failed to read image from shardedfilestore")
 		c.urlMap.Delete(urlHash)
 		return []byte{}, false
 	}
 
 	bytes := buffer.Bytes()
-
-	spew.Dump(len(bytes))
-	fmt.Println("Got from cache")
-	fmt.Println("")
 	return bytes, true
 }
 
 // Set saves a response to the cache as key
 func (c *ImageProxyCache) Set(key string, resp []byte) {
 	urlHash := getHash(key)
-	spew.Dump("Set", key, len(resp), urlHash)
 
 	metaData := tusd.MetaData{
 		"Url": key,
@@ -89,17 +84,12 @@ func (c *ImageProxyCache) Set(key string, resp []byte) {
 
 	c.store.FinishUpload(id)
 	c.urlMap.Store(urlHash, id)
-
-	fmt.Println("Set in cache")
-	fmt.Println("")
 }
 
 // Delete removes the response with key from the cache
 func (c *ImageProxyCache) Delete(key string) {
 	urlHash := getHash(key)
 	c.urlMap.Delete(urlHash)
-	spew.Dump("Delete", key)
-	fmt.Println("")
 }
 
 // NewImageProxyCache returns a new Cache that will store files in basePath
