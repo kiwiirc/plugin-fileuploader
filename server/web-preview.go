@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -37,6 +36,8 @@ type imgWaiterItem struct {
 	wg      sync.WaitGroup
 }
 
+var httpClient *http.Client
+
 // HTML template
 var template string
 var templateLock sync.RWMutex
@@ -57,9 +58,13 @@ var imgProxy *imageproxy.Proxy
 // Used to detect possible image urls
 var isImage = regexp.MustCompile(`\.(jpe?g|png|gifv?)$`)
 
-func (serv *UploadServer) registerEmbedHandlers(r *gin.Engine, cfg Config) error {
+func (serv *UploadServer) registerWebPreviewHandlers(r *gin.Engine, cfg Config) error {
 	serv.log.Info().
 		Msg("Starting embed handlers")
+
+	httpClient = &http.Client{
+		Timeout: time.Second * 30,
+	}
 
 	// Prepare oEmbed provider
 	oembedJSON, err := getProvidersCached("https://oembed.com/providers.json", "oembed-providers.json", false)
@@ -127,7 +132,7 @@ func (serv *UploadServer) registerEmbedHandlers(r *gin.Engine, cfg Config) error
 
 	// Register our handler
 	rg := r.Group("/embed")
-	rg.GET("", serv.handleEmbed)
+	rg.GET("", serv.handleWebPreview)
 
 	// Create imageproxy and provide interface to shardedfilestore
 	imgCache := NewImageProxyCache(serv.store, serv.log)
@@ -190,7 +195,7 @@ func (serv *UploadServer) handleImageCache(c *gin.Context) {
 	}
 }
 
-func (serv *UploadServer) handleEmbed(c *gin.Context) {
+func (serv *UploadServer) handleWebPreview(c *gin.Context) {
 	queryURL := c.Query("url")
 	if !isValidURL(queryURL) {
 		c.AbortWithStatus(http.StatusBadRequest)
@@ -321,7 +326,7 @@ func getProvidersCached(url string, filePath string, force bool) (*[]byte, error
 	var err error
 	if _, err = os.Stat(filePath); force || os.IsNotExist(err) {
 		var httpResp *http.Response
-		httpResp, err = http.Get(url)
+		httpResp, err = httpClient.Get(url)
 		if err != nil {
 			return nil, errors.New("Failed to fetch providers: " + err.Error())
 		}
@@ -414,11 +419,11 @@ func (serv *UploadServer) cleanCache(cacheMaxAge time.Duration) {
 
 		cacheMutex.Lock()
 		for _, hash := range expired {
-			if hash == "" {
-				break
-			}
-			log.Println("Deleting cache item: " + hash)
 			delete(cache, hash)
+			serv.log.Info().
+				Str("event", "expired").
+				Str("hash", hash).
+				Msg("Pruned from HTML cache")
 		}
 		cacheMutex.Unlock()
 	}
@@ -428,15 +433,15 @@ func (serv *UploadServer) cleanCache(cacheMaxAge time.Duration) {
 		serv.log.Debug().
 			Msgf("Cleaning %d item from img waiter cache", len(expired))
 
-		cacheMutex.Lock()
+		imgWaiterMutex.Lock()
 		for _, hash := range expiredWaiters {
-			if hash == "" {
-				break
-			}
-			log.Println("Deleting cache item: " + hash)
 			delete(imgWaiter, hash)
+			serv.log.Info().
+				Str("event", "expired").
+				Str("hash", hash).
+				Msg("Pruned from image waiter")
 		}
-		cacheMutex.Unlock()
+		imgWaiterMutex.Unlock()
 	}
 }
 

@@ -78,7 +78,7 @@ func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 		return err
 	}
 
-	err = serv.registerEmbedHandlers(serv.Router, serv.cfg)
+	err = serv.registerWebPreviewHandlers(serv.Router, serv.cfg)
 	if err != nil {
 		return err
 	}

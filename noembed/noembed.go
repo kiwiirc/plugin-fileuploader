@@ -8,13 +8,15 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var noembedURL = "https://noembed.com/embed?url={url}"
 
 // NoEmbed represents this package
 type NoEmbed struct {
-	data *Data
+	data       *Data
+	httpClient *http.Client
 }
 
 // Data represents the data for noembed providers
@@ -43,7 +45,11 @@ type Response struct {
 
 // New returns a Noembed object
 func New() *NoEmbed {
-	return &NoEmbed{}
+	return &NoEmbed{
+		httpClient: &http.Client{
+			Timeout: time.Second * 30,
+		},
+	}
 }
 
 // ParseProviders parses the raw json obtained from noembed.com
@@ -73,7 +79,7 @@ func (n *NoEmbed) Get(url string) (resp *Response, err error) {
 	reqURL := strings.Replace(noembedURL, "{url}", url, 1)
 
 	var httpResp *http.Response
-	httpResp, err = http.Get(reqURL)
+	httpResp, err = n.httpClient.Get(reqURL)
 	if err != nil {
 		return
 	}
