@@ -1,15 +1,16 @@
 package server
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,7 +19,8 @@ import (
 
 	"github.com/dyatlov/go-oembed/oembed"
 	"github.com/gin-gonic/gin"
-	"github.com/kiwiirc/plugin-fileuploader/noembed"
+	fallbackembed "github.com/kiwiirc/plugin-fileuploader/fallback-embed"
+	"github.com/kiwiirc/plugin-fileuploader/templates"
 	"willnorris.com/go/imageproxy"
 )
 
@@ -52,7 +54,8 @@ var imgWaiter = make(map[string]*imgWaiterItem)
 var imgWaiterMutex sync.Mutex
 
 var oEmbed *oembed.Oembed
-var noEmbed *noembed.NoEmbed
+var fallbackEmbed *fallbackembed.FallbackEmbed
+var fallbackEmbedDisabled bool
 var imgProxy *imageproxy.Proxy
 
 // Used to detect possible image urls
@@ -60,14 +63,47 @@ var isImage = regexp.MustCompile(`\.(jpe?g|png|gifv?)$`)
 
 func (serv *UploadServer) registerWebPreviewHandlers(r *gin.Engine, cfg Config) error {
 	serv.log.Info().
-		Msg("Starting embed handlers")
+		Msg("Starting web preview handlers")
 
 	httpClient = &http.Client{
 		Timeout: time.Second * 30,
 	}
 
+	// Check config defaults
+	cacheCleanInterval := cfg.WebPreview.CacheCleanInterval.Duration
+	if cacheCleanInterval == time.Duration(0) {
+		cacheCleanInterval, _ = time.ParseDuration("15m")
+	}
+
+	cacheMaxAge := cfg.WebPreview.CacheMaxAge.Duration
+	if cacheMaxAge == time.Duration(0) {
+		cacheMaxAge, _ = time.ParseDuration("1h")
+	}
+
+	templatesDir := cfg.WebPreview.TemplatesDirectory
+	if templatesDir == "" {
+		templatesDir = "templates"
+	}
+
+	fallbackProviderURL := cfg.WebPreview.FallbackProviderURL
+	if fallbackProviderURL == "" {
+		fallbackProviderURL = "https://noembed.com/embed?url={url}"
+	}
+
+	fallbackProviderFile := cfg.WebPreview.FallbackProviderFile
+	if fallbackProviderFile == "" {
+		fallbackProviderFile = "fallback-providers.json"
+	}
+
+	fallbackProviderJsonKey := cfg.WebPreview.FallbackProviderJsonKey
+	if fallbackProviderJsonKey == "" {
+		fallbackProviderJsonKey = "html"
+	}
+
+	fallbackEmbedDisabled = cfg.WebPreview.FallbackProviderDisabled
+
 	// Prepare oEmbed provider
-	oembedJSON, err := getProvidersCached("https://oembed.com/providers.json", "oembed-providers.json", false)
+	oembedJSON, err := getEmbedProviders("https://oembed.com/providers.json")
 	if err != nil {
 		serv.log.Error().
 			Err(err).
@@ -75,7 +111,7 @@ func (serv *UploadServer) registerWebPreviewHandlers(r *gin.Engine, cfg Config) 
 		return err
 	}
 	oEmbed = oembed.NewOembed()
-	err = oEmbed.ParseProviders(bytes.NewReader(*oembedJSON))
+	err = oEmbed.ParseProviders(oembedJSON)
 	if err != nil {
 		serv.log.Error().
 			Err(err).
@@ -83,37 +119,42 @@ func (serv *UploadServer) registerWebPreviewHandlers(r *gin.Engine, cfg Config) 
 		return err
 	}
 
-	// Prepare noEmbed provider
-	noembedJSON, err := getProvidersCached("https://noembed.com/providers", "noembed-providers.json", false)
-	if err != nil {
-		serv.log.Error().
-			Err(err).
-			Msg("Failed to get noembed providers json")
-		return err
-	}
-	noEmbed = noembed.New()
-	err = noEmbed.ParseProviders(bytes.NewReader(*noembedJSON))
-	if err != nil {
-		serv.log.Error().
-			Err(err).
-			Msg("Failed to parse noembed providers json")
-		return err
-	}
-
-	// Check config defaults
-	cacheCleanInterval := cfg.Embed.CacheCleanInterval.Duration
-	if cacheCleanInterval == time.Duration(0) {
-		cacheCleanInterval, _ = time.ParseDuration("15m")
-	}
-
-	cacheMaxAge := cfg.Embed.CacheMaxAge.Duration
-	if cacheMaxAge == time.Duration(0) {
-		cacheMaxAge, _ = time.ParseDuration("1h")
-	}
-
-	templatePath := cfg.Embed.TemplatePath
-	if templatePath == "" {
-		templatePath = "templates/embed.html"
+	if !fallbackEmbedDisabled {
+		if _, err := os.Stat(fallbackProviderFile); err == nil {
+			// Fallback provider file exists attempt to read and parse it
+			file, err := os.Open(fallbackProviderFile)
+			if err != nil {
+				serv.log.Error().
+					Err(err).
+					Msg("Failed to open fallback providers json")
+				return err
+			}
+			err = fallbackEmbed.ParseProviders(bufio.NewReader(file))
+			if err != nil {
+				serv.log.Error().
+					Err(err).
+					Msg("Failed to parse fallback providers json")
+				return err
+			}
+		} else if strings.HasPrefix(fallbackProviderURL, "https://noembed.com/") {
+			// No fallback provider file and the url is noembed.com
+			// attempt to fetch and parse the providers.json from noembed.com
+			noembedJSON, err := getEmbedProviders("https://noembed.com/providers")
+			if err != nil {
+				serv.log.Error().
+					Err(err).
+					Msg("Failed to get fallback providers json")
+				return err
+			}
+			fallbackEmbed = fallbackembed.New(fallbackProviderURL, fallbackProviderJsonKey)
+			err = fallbackEmbed.ParseProviders(noembedJSON)
+			if err != nil {
+				serv.log.Error().
+					Err(err).
+					Msg("Failed to parse noembed providers json")
+				return err
+			}
+		}
 	}
 
 	// Start the cleanup ticker
@@ -123,12 +164,7 @@ func (serv *UploadServer) registerWebPreviewHandlers(r *gin.Engine, cfg Config) 
 	)
 
 	// Load embed html template
-	if err := loadTemplate(templatePath); err != nil {
-		serv.log.Error().
-			Err(err).
-			Msg("Failed to load template")
-		return err
-	}
+	serv.initTemplates(templatesDir)
 
 	// Register our handler
 	rg := r.Group("/embed")
@@ -281,15 +317,15 @@ func (serv *UploadServer) handleWebPreview(c *gin.Context) {
 			}
 		}
 
-		// No embedable html, time to try noembed
-		if item.html == "" {
-			noEmbedResp, err := noEmbed.Get(queryURL)
+		// No embedable html, time to try our fallback provider
+		if item.html == "" && !fallbackEmbedDisabled {
+			noEmbedResp, err := fallbackEmbed.Get(queryURL, width, height)
 			if err != nil {
 				serv.log.Error().
 					Err(err).
 					Msg("Unexpected error in noEmbed")
 			} else {
-				item.html = noEmbedResp.HTML
+				item.html = noEmbedResp
 			}
 		}
 
@@ -322,64 +358,19 @@ func (serv *UploadServer) handleWebPreview(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(htmlData))
 }
 
-func getProvidersCached(url string, filePath string, force bool) (*[]byte, error) {
-	var err error
-	if _, err = os.Stat(filePath); force || os.IsNotExist(err) {
-		var httpResp *http.Response
-		httpResp, err = httpClient.Get(url)
-		if err != nil {
-			return nil, errors.New("Failed to fetch providers: " + err.Error())
-		}
-		defer httpResp.Body.Close()
-
-		var rawJSON []byte
-		rawJSON, err = ioutil.ReadAll(httpResp.Body)
-		if err != nil {
-			return nil, errors.New("Failed to read providers: " + err.Error())
-		}
-
-		// Unmarshal to temp interface to ensure valid json
-		var temp interface{}
-		err = json.Unmarshal(rawJSON, &temp)
-		if err != nil {
-			return nil, errors.New("Failed to parse providers: " + err.Error())
-		}
-
-		// Data appears to be valid json open providers file for writing
-		var file *os.File
-		file, err = os.Create(filePath)
-		if err != nil {
-			return nil, errors.New("Failed to create providers file: " + err.Error())
-		}
-		defer file.Close()
-
-		// Write providers.json
-		_, err = file.Write(rawJSON)
-		if err != nil {
-			return nil, errors.New("Failed to write providers: " + err.Error())
-		}
-
-		return &rawJSON, nil
-	} else if err != nil {
-		return nil, errors.New("Failed to stat providers file: " + err.Error())
-	}
-
-	// Open existing providers file
-	var file *os.File
-	file, err = os.Open(filePath)
+func getEmbedProviders(url string) (*bytes.Reader, error) {
+	var httpResp *http.Response
+	httpResp, err := httpClient.Get(url)
 	if err != nil {
-		return nil, errors.New("Failed to open providers: " + err.Error())
+		return nil, errors.New("Failed to fetch embed providers: " + err.Error())
 	}
-	defer file.Close()
+	defer httpResp.Body.Close()
 
-	// Read existing providers file
-	var rawJSON []byte
-	rawJSON, err = ioutil.ReadAll(file)
+	body, err := ioutil.ReadAll(httpResp.Body)
 	if err != nil {
-		return nil, errors.New("Failed to read providers: " + err.Error())
+		return nil, errors.New("Failed to read embed providers: " + err.Error())
 	}
-
-	return &rawJSON, nil
+	return bytes.NewReader(body), nil
 }
 
 func (serv *UploadServer) startCleanupTicker(cleanInterval, cacheMaxAge time.Duration) {
@@ -409,7 +400,7 @@ func (serv *UploadServer) cleanCache(cacheMaxAge time.Duration) {
 		if item.created >= createdBefore {
 			continue
 		}
-		expired = append(expiredWaiters, hash)
+		expiredWaiters = append(expiredWaiters, hash)
 	}
 
 	// Remove expired items from HTML cache
@@ -420,7 +411,7 @@ func (serv *UploadServer) cleanCache(cacheMaxAge time.Duration) {
 		cacheMutex.Lock()
 		for _, hash := range expired {
 			delete(cache, hash)
-			serv.log.Info().
+			serv.log.Debug().
 				Str("event", "expired").
 				Str("hash", hash).
 				Msg("Pruned from HTML cache")
@@ -431,12 +422,12 @@ func (serv *UploadServer) cleanCache(cacheMaxAge time.Duration) {
 	// Remove expired items from img waiter
 	if len(expiredWaiters) > 0 {
 		serv.log.Debug().
-			Msgf("Cleaning %d item from img waiter cache", len(expired))
+			Msgf("Cleaning %d item from img waiter cache", len(expiredWaiters))
 
 		imgWaiterMutex.Lock()
 		for _, hash := range expiredWaiters {
 			delete(imgWaiter, hash)
-			serv.log.Info().
+			serv.log.Debug().
 				Str("event", "expired").
 				Str("hash", hash).
 				Msg("Pruned from image waiter")
@@ -445,15 +436,27 @@ func (serv *UploadServer) cleanCache(cacheMaxAge time.Duration) {
 	}
 }
 
-func loadTemplate(templatePath string) error {
+func (serv *UploadServer) initTemplates(templatesDir string) {
+	templatePath := path.Join(templatesDir, "Embed.html")
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		// No template file use content from binary
+		templateLock.Lock()
+		template, _ = templates.Get["Embed"]
+		templateLock.Unlock()
+		return
+	}
+
+	// Template file exists read it from disk
 	html, err := ioutil.ReadFile(templatePath)
 	if err != nil {
-		return err
+		serv.log.Error().
+			Err(err).
+			Str("path", templatePath).
+			Msg("Failed to read embed template")
 	}
 	templateLock.Lock()
 	template = string(html)
 	templateLock.Unlock()
-	return nil
 }
 
 func getImageHTML(c *gin.Context, url string, height int) string {

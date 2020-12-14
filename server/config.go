@@ -46,13 +46,17 @@ type Config struct {
 	JwtSecretsByIssuer map[string]string
 	Loggers            []LoggerConfig
 
-	// Embed Provider
-	Embed struct {
-		TemplatePath       string
+	// WebPreview config options
+	WebPreview struct {
+		TemplatesDirectory string
 		CacheMaxAge        duration
 		CacheCleanInterval duration
-		ImageCachePath     string
-		ImageCacheMaxSize  uint64
+
+		// Fallback provider configuration
+		FallbackProviderDisabled bool
+		FallbackProviderURL      string
+		FallbackProviderFile     string
+		FallbackProviderJsonKey  string
 	}
 }
 
