@@ -347,14 +347,27 @@ func (serv *UploadServer) handleWebPreview(c *gin.Context) {
 	item.wg.Wait()
 
 	// Prepare html and send it to the client
-	style := "display: flex; justify-content: center;"
+	style := `
+	body {
+		display: flex; justify-content: center;
+	}`
 	if !center {
-		style = ""
+		style = `
+		body {
+			overflow: hidden;
+		}
+		#kiwi-embed-container {
+			position: absolute;
+			top: 0;
+			left: 0;
+			bottom: 0;
+			overflow: auto;
+		}`
 	}
 	templateLock.RLock()
 	htmlData := strings.Replace(template, "{{body.html}}", item.html, -1)
 	templateLock.RUnlock()
-	htmlData = strings.Replace(htmlData, "/* style.body */", style, -1)
+	htmlData = strings.Replace(htmlData, "/* style.extras */", style, -1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(htmlData))
 }
 

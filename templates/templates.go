@@ -1,7 +1,7 @@
 package templates
 
 var Get = map[string]string{
-	"Embed": `<!DOCTYPE html>
+"Embed": `<!DOCTYPE html>
 <html>
     <head>
         <style>
@@ -9,12 +9,10 @@ var Get = map[string]string{
                 margin: 0;
                 padding: 0;
             }
-            body {
-                /* style.body */
-            }
             .kiwi-embed-image {
                 display: block;
             }
+            /* style.extras */
         </style>
         <script>
             let last_width = 0;

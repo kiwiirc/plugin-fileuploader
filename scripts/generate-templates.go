@@ -17,7 +17,7 @@ func main() {
 	out.Write([]byte("package templates\n\nvar Get = map[string]string{\n"))
 	for _, fileInfo := range files {
 		if strings.HasSuffix(fileInfo.Name(), ".html") {
-			out.Write([]byte(strings.TrimSuffix(fileInfo.Name(), ".html") + ": `"))
+			out.Write([]byte("\"" + strings.TrimSuffix(fileInfo.Name(), ".html") + "\"" + ": `"))
 			file, _ := os.Open(path.Join(templatesDir, fileInfo.Name()))
 			io.Copy(out, file)
 			out.Write([]byte("`,\n"))
