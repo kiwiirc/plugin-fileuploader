@@ -1,7 +1,7 @@
 package templates
 
 var Get = map[string]string{
-"Embed": `<!DOCTYPE html>
+"webpreview": `<!DOCTYPE html>
 <html>
     <head>
         <style>

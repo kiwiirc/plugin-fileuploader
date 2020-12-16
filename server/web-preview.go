@@ -450,11 +450,11 @@ func (serv *UploadServer) cleanCache(cacheMaxAge time.Duration) {
 }
 
 func (serv *UploadServer) initTemplates(templatesDir string) {
-	templatePath := path.Join(templatesDir, "Embed.html")
+	templatePath := path.Join(templatesDir, "webpreview.html")
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
 		// No template file use content from binary
 		templateLock.Lock()
-		template, _ = templates.Get["Embed"]
+		template, _ = templates.Get["webpreview"]
 		templateLock.Unlock()
 		return
 	}
@@ -465,7 +465,7 @@ func (serv *UploadServer) initTemplates(templatesDir string) {
 		serv.log.Error().
 			Err(err).
 			Str("path", templatePath).
-			Msg("Failed to read embed template")
+			Msg("Failed to read webpreview template")
 	}
 	templateLock.Lock()
 	template = string(html)
