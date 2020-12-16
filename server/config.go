@@ -41,6 +41,7 @@ type Config struct {
 	Expiration struct {
 		MaxAge           duration
 		IdentifiedMaxAge duration
+		DeletedMaxAge    duration
 		CheckInterval    duration
 	}
 	JwtSecretsByIssuer map[string]string

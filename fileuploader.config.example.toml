@@ -43,6 +43,7 @@ Path = "./uploads.db"
 # Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 MaxAge = "24h" # 1 day
 IdentifiedMaxAge = "168h" # 1 week
+DeletedMaxAge = "720h" # 30 days
 CheckInterval = "5m"
 
 [WebPreview]

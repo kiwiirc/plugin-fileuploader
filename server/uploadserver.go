@@ -68,6 +68,7 @@ func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 		serv.store,
 		serv.cfg.Expiration.MaxAge.Duration,
 		serv.cfg.Expiration.IdentifiedMaxAge.Duration,
+		serv.cfg.Expiration.DeletedMaxAge.Duration,
 		serv.cfg.Expiration.CheckInterval.Duration,
 		serv.cfg.JwtSecretsByIssuer,
 		serv.log,

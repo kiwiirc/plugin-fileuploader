@@ -12,17 +12,19 @@ type Expirer struct {
 	store              *shardedfilestore.ShardedFileStore
 	maxAge             time.Duration
 	identifiedMaxAge   time.Duration
+	deletedMaxAge      time.Duration
 	jwtSecretsByIssuer map[string]string
 	quitChan           chan struct{} // closes when ticker has been stopped
 	log                *zerolog.Logger
 }
 
-func New(store *shardedfilestore.ShardedFileStore, maxAge, identifiedMaxAge, checkInterval time.Duration, jwtSecretsByIssuer map[string]string, log *zerolog.Logger) *Expirer {
+func New(store *shardedfilestore.ShardedFileStore, maxAge, identifiedMaxAge, deletedMaxAge, checkInterval time.Duration, jwtSecretsByIssuer map[string]string, log *zerolog.Logger) *Expirer {
 	expirer := &Expirer{
 		ticker:             time.NewTicker(checkInterval),
 		store:              store,
 		maxAge:             maxAge,
 		identifiedMaxAge:   identifiedMaxAge,
+		deletedMaxAge:      deletedMaxAge,
 		jwtSecretsByIssuer: jwtSecretsByIssuer,
 		quitChan:           make(chan struct{}),
 		log:                log,
@@ -81,6 +83,13 @@ func (expirer *Expirer) gc(t time.Time) {
 			Str("id", id).
 			Msg("Terminated upload id")
 	}
+
+	err = expirer.deleteExpired()
+	if err != nil {
+		expirer.log.Error().
+			Err(err).
+			Msg("Failed to purge deleted uploads from database")
+	}
 }
 
 func (expirer *Expirer) getExpired() (expiredIds []string, err error) {
@@ -108,6 +117,41 @@ func (expirer *Expirer) getExpired() (expiredIds []string, err error) {
 			`,
 			expirer.maxAge.Seconds(),
 			expirer.identifiedMaxAge.Seconds(),
+		)
+	default:
+		panic("Unhandled database driver")
+	}
+
+	return
+}
+
+func (expirer *Expirer) deleteExpired() (err error) {
+	switch expirer.store.DBConn.DBConfig.DriverName {
+	case "sqlite3":
+		_, err = expirer.store.DBConn.DB.Exec(`
+			DELETE FROM uploads
+			WHERE
+				CAST(strftime('%s', 'now') AS INTEGER) -- current time
+				>=
+				created_at + (CASE WHEN jwt_account IS NULL THEN $1 ELSE $2 END) + $3 -- expiration time
+			AND deleted == 1
+			`,
+			expirer.maxAge.Seconds(),
+			expirer.identifiedMaxAge.Seconds(),
+			expirer.deletedMaxAge.Seconds(),
+		)
+	case "mysql":
+		_, err = expirer.store.DBConn.DB.Exec(`
+			DELETE FROM uploads
+			WHERE
+				UNIX_TIMESTAMP() -- current time
+				>=
+				created_at + (CASE WHEN jwt_account IS NULL THEN ? ELSE ? END) + ? -- expiration time
+			AND deleted == 1
+			`,
+			expirer.maxAge.Seconds(),
+			expirer.identifiedMaxAge.Seconds(),
+			expirer.deletedMaxAge.Seconds(),
 		)
 	default:
 		panic("Unhandled database driver")
