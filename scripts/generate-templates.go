@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -19,7 +18,10 @@ func main() {
 		if strings.HasSuffix(fileInfo.Name(), ".html") {
 			out.Write([]byte("\"" + strings.TrimSuffix(fileInfo.Name(), ".html") + "\"" + ": `"))
 			file, _ := os.Open(path.Join(templatesDir, fileInfo.Name()))
-			io.Copy(out, file)
+			data, _ := ioutil.ReadAll(file)
+			dataStr := string(data)
+			// backticks cannot be escaped in go, workaround this by putting them in normal quotes and concatenating
+			out.Write([]byte(strings.ReplaceAll(dataStr, "`", "`+\"`\"+`")))
 			out.Write([]byte("`,\n"))
 		}
 	}
