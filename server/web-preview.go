@@ -331,7 +331,7 @@ func (serv *UploadServer) handleWebPreview(c *gin.Context) {
 
 		// Still no html send an error to the parent
 		if item.html == "" {
-			item.html = "<script>window.parent.postMessage({ error: true }, '*');</script>"
+			item.html = "<script>window.parent.postMessage({ error: 'not_supported' }, '*');</script>"
 		}
 
 		// Decrease the waitgroup so other requests can complete
