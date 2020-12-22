@@ -58,6 +58,7 @@ func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 	serv.store = shardedfilestore.New(
 		serv.cfg.Storage.Path,
 		serv.cfg.Storage.ShardLayers,
+		serv.cfg.Storage.ExifRemove,
 		serv.DBConn,
 		serv.log,
 	)

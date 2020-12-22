@@ -19,6 +19,7 @@ import (
 	"github.com/kiwiirc/plugin-fileuploader/db"
 	_ "github.com/mattn/go-sqlite3" // register SQL driver
 	"github.com/rs/zerolog"
+	exifremove "github.com/scottleedavis/go-exif-remove"
 	lockfile "gopkg.in/Acconut/lockfile.v1"
 
 	"github.com/tus/tusd"
@@ -33,6 +34,7 @@ var defaultDirectoryPerm = os.FileMode(0775)
 type ShardedFileStore struct {
 	BasePath          string // Relative or absolute path to store files in.
 	PrefixShardLayers int    // Number of extra directory layers to prefix file paths with.
+	ExifRemove        bool   // Should attempt to remvoe exif data
 	DBConn            *db.DatabaseConnection
 	log               *zerolog.Logger
 }
@@ -41,11 +43,12 @@ type ShardedFileStore struct {
 // be used as the only storage entry. This method does not check
 // whether the path exists, use os.MkdirAll to ensure.
 // In addition, a locking mechanism is provided.
-func New(basePath string, prefixShardLayers int, dbConnection *db.DatabaseConnection, log *zerolog.Logger) *ShardedFileStore {
+func New(basePath string, prefixShardLayers int, exifRemove bool, dbConnection *db.DatabaseConnection, log *zerolog.Logger) *ShardedFileStore {
 
 	store := &ShardedFileStore{
 		BasePath:          basePath,
 		PrefixShardLayers: prefixShardLayers,
+		ExifRemove:        exifRemove,
 		DBConn:            dbConnection,
 		log:               log,
 	}
@@ -411,6 +414,49 @@ func (store *ShardedFileStore) FinishUpload(id string) error {
 		Str("event", "upload_finished").
 		Str("id", id).Msg("Finishing upload")
 
+	oldPath := store.incompleteBinPath(id)
+
+	// If upload is an image file attempt to remvoe exif data
+	if store.ExifRemove {
+		info, err := store.GetInfo(id)
+		if err != nil {
+			store.log.Error().
+				Err(err).
+				Str("id", id).
+				Msg("Failed to read file info")
+			return err
+		}
+
+		if fileType, ok := info.MetaData["filetype"]; ok && (fileType == "image/png" || fileType == "image/jpeg") {
+			imgBytes, err := ioutil.ReadFile(oldPath)
+			if err != nil {
+				store.log.Error().
+					Err(err).
+					Str("oldPath", oldPath).
+					Msg("Failed to read image file")
+				return err
+			}
+
+			noExifBytes, err := exifremove.Remove(imgBytes)
+			if err != nil {
+				store.log.Error().
+					Err(err).
+					Str("oldPath", oldPath).
+					Msg("Failed to remove exif data")
+				return err
+			}
+
+			err = ioutil.WriteFile(oldPath, noExifBytes, defaultFilePerm)
+			if err != nil {
+				store.log.Error().
+					Err(err).
+					Str("oldPath", oldPath).
+					Msg("Failed to write image file")
+				return err
+			}
+		}
+	}
+
 	// calculate hash
 	hash, err := store.hashFile(id)
 	if err != nil {
@@ -430,7 +476,6 @@ func (store *ShardedFileStore) FinishUpload(id string) error {
 	// relocate file
 	newPath := store.completeBinPath(hash)
 	os.MkdirAll(filepath.Dir(newPath), defaultDirectoryPerm)
-	oldPath := store.incompleteBinPath(id)
 
 	if _, err := os.Stat(newPath); err != nil {
 		// file needs moving to the sharded filestore
