@@ -32,6 +32,7 @@ type Config struct {
 	Storage struct {
 		Path              string
 		ShardLayers       int
+		ExifRemove        bool
 		MaximumUploadSize datasize.ByteSize
 	}
 	Database struct {

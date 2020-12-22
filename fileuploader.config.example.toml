@@ -30,6 +30,7 @@ TrustedReverseProxyRanges = [
 [Storage]
 Path = "./uploads"
 ShardLayers = 6
+ExifRemove = true # will attempt to remove exif data from jpg and png files
 MaximumUploadSize = "10 MB" # accepts units such as: MB, g, tB, peta, kilobytes, gigabyte
 
 [Database]
