@@ -6,8 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -86,6 +86,11 @@ func (serv *UploadServer) registerWebPreviewHandlers(r *gin.Engine, cfg Config) 
 		templatesDir = "templates"
 	}
 
+	oembedProviderFile := cfg.WebPreview.OembedProviderFile
+	if oembedProviderFile == "" {
+		oembedProviderFile = "oembed-providers.json"
+	}
+
 	fallbackProviderURL := cfg.WebPreview.FallbackProviderURL
 	if fallbackProviderURL == "" {
 		fallbackProviderURL = "https://noembed.com/embed?url={url}"
@@ -104,7 +109,7 @@ func (serv *UploadServer) registerWebPreviewHandlers(r *gin.Engine, cfg Config) 
 	fallbackEmbedDisabled = cfg.WebPreview.FallbackProviderDisabled
 
 	// Prepare oEmbed provider
-	oembedJSON, err := getEmbedProviders("https://oembed.com/providers.json")
+	oembedJSON, err := serv.getProviderFileOrURL(oembedProviderFile, "https://oembed.com/providers.json")
 	if err != nil {
 		serv.log.Error().
 			Err(err).
@@ -121,40 +126,17 @@ func (serv *UploadServer) registerWebPreviewHandlers(r *gin.Engine, cfg Config) 
 	}
 
 	if !fallbackEmbedDisabled {
-		if _, err := os.Stat(fallbackProviderFile); err == nil {
-			// Fallback provider file exists attempt to read and parse it
-			file, err := os.Open(fallbackProviderFile)
-			if err != nil {
-				serv.log.Error().
-					Err(err).
-					Msg("Failed to open fallback providers json")
-				return err
-			}
-			err = fallbackEmbed.ParseProviders(bufio.NewReader(file))
-			if err != nil {
-				serv.log.Error().
-					Err(err).
-					Msg("Failed to parse fallback providers json")
-				return err
-			}
-		} else if strings.HasPrefix(fallbackProviderURL, "https://noembed.com/") {
-			// No fallback provider file and the url is noembed.com
-			// attempt to fetch and parse the providers.json from noembed.com
-			noembedJSON, err := getEmbedProviders("https://noembed.com/providers")
-			if err != nil {
-				serv.log.Error().
-					Err(err).
-					Msg("Failed to get fallback providers json")
-				return err
-			}
-			fallbackEmbed = fallbackembed.New(fallbackProviderURL, fallbackProviderJsonKey)
-			err = fallbackEmbed.ParseProviders(noembedJSON)
-			if err != nil {
-				serv.log.Error().
-					Err(err).
-					Msg("Failed to parse noembed providers json")
-				return err
-			}
+		err := serv.initFallbackProvider(
+			fallbackProviderFile,
+			fallbackProviderURL,
+			fallbackProviderJsonKey,
+		)
+
+		if err != nil {
+			serv.log.Error().
+				Err(err).
+				Msg("Failed to init fallback provider, disabling")
+			fallbackEmbedDisabled = true
 		}
 	}
 
@@ -234,7 +216,7 @@ func (serv *UploadServer) handleImageCache(c *gin.Context) {
 
 func (serv *UploadServer) handleWebPreview(c *gin.Context) {
 	queryURL := c.Query("url")
-	log.Printf("queryURL: " + queryURL)
+
 	if !isValidURL(queryURL) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
@@ -373,19 +355,25 @@ func (serv *UploadServer) handleWebPreview(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(htmlData))
 }
 
-func getEmbedProviders(url string) (*bytes.Reader, error) {
-	var httpResp *http.Response
-	httpResp, err := httpClient.Get(url)
-	if err != nil {
-		return nil, errors.New("Failed to fetch embed providers: " + err.Error())
-	}
-	defer httpResp.Body.Close()
+func (serv *UploadServer) getProviderFileOrURL(filename, url string) (io.Reader, error) {
+	if _, err := os.Stat(filename); err == nil {
+		serv.log.Debug().
+			Str("file", filename).
+			Msg("Fetching embed providers from")
+		file, err := os.Open(filename)
+		if err == nil {
+			return file, nil
+		}
 
-	body, err := ioutil.ReadAll(httpResp.Body)
-	if err != nil {
-		return nil, errors.New("Failed to read embed providers: " + err.Error())
+		serv.log.Error().
+			Err(err).
+			Msg("Failed to open providers json")
 	}
-	return bytes.NewReader(body), nil
+
+	serv.log.Debug().
+		Str("url", url).
+		Msg("Fetching embed providers from")
+	return getEmbedProviders(url)
 }
 
 func (serv *UploadServer) startCleanupTicker(cleanInterval, cacheMaxAge time.Duration) {
@@ -451,6 +439,40 @@ func (serv *UploadServer) cleanCache(cacheMaxAge time.Duration) {
 	}
 }
 
+func (serv *UploadServer) initFallbackProvider(fallbackProviderFile, fallbackProviderURL, fallbackProviderJsonKey string) error {
+	if _, err := os.Stat(fallbackProviderFile); err == nil {
+		// Fallback provider file exists attempt to read and parse it
+		file, err := os.Open(fallbackProviderFile)
+		if err != nil {
+			return errors.New("Failed to open fallback providers json: " + err.Error())
+		}
+		err = fallbackEmbed.ParseProviders(bufio.NewReader(file))
+		if err != nil {
+			return errors.New("Failed to parse fallback providers json: " + err.Error())
+		}
+
+		return nil
+	}
+
+	if strings.HasPrefix(fallbackProviderURL, "https://noembed.com/") {
+		// No fallback provider file and the url is noembed.com
+		// attempt to fetch and parse the providers.json from noembed.com
+		noembedJSON, err := getEmbedProviders("https://noembed.com/providers")
+		if err != nil {
+			return errors.New("Failed to get fallback providers json: " + err.Error())
+		}
+		fallbackEmbed = fallbackembed.New(fallbackProviderURL, fallbackProviderJsonKey)
+		err = fallbackEmbed.ParseProviders(noembedJSON)
+		if err != nil {
+			return errors.New("Failed to parse fallback providers json: " + err.Error())
+		}
+
+		return nil
+	}
+
+	return errors.New("Tried to init fallback provider without provider json file")
+}
+
 func (serv *UploadServer) initTemplates(templatesDir string) {
 	templatePath := path.Join(templatesDir, "webpreview.html")
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
@@ -472,6 +494,21 @@ func (serv *UploadServer) initTemplates(templatesDir string) {
 	templateLock.Lock()
 	template = string(html)
 	templateLock.Unlock()
+}
+
+func getEmbedProviders(url string) (*bytes.Reader, error) {
+	var httpResp *http.Response
+	httpResp, err := httpClient.Get(url)
+	if err != nil {
+		return nil, errors.New("Failed to fetch embed providers: " + err.Error())
+	}
+	defer httpResp.Body.Close()
+
+	body, err := ioutil.ReadAll(httpResp.Body)
+	if err != nil {
+		return nil, errors.New("Failed to read embed providers: " + err.Error())
+	}
+	return bytes.NewReader(body), nil
 }
 
 func getImageHTML(c *gin.Context, url string, height int) string {

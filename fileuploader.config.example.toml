@@ -47,6 +47,7 @@ DeletedMaxAge = "720h" # 30 days
 CheckInterval = "5m"
 
 [WebPreview]
+OembedProviderFile = "oembed-providers.json"
 TemplatesDirectory = "templates"
 CacheMaxAge = "1h"
 CacheCleanInterval = "15m"
