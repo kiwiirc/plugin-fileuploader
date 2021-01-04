@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -233,6 +234,7 @@ func (serv *UploadServer) handleImageCache(c *gin.Context) {
 
 func (serv *UploadServer) handleWebPreview(c *gin.Context) {
 	queryURL := c.Query("url")
+	log.Printf("queryURL: " + queryURL)
 	if !isValidURL(queryURL) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
@@ -319,13 +321,13 @@ func (serv *UploadServer) handleWebPreview(c *gin.Context) {
 
 		// No embedable html, time to try our fallback provider
 		if item.html == "" && !fallbackEmbedDisabled {
-			noEmbedResp, err := fallbackEmbed.Get(queryURL, width, height)
+			fallbackEmbedResp, err := fallbackEmbed.Get(queryURL, width, height)
 			if err != nil {
 				serv.log.Error().
 					Err(err).
-					Msg("Unexpected error in noEmbed")
+					Msg("Unexpected error in fallback embed")
 			} else {
-				item.html = noEmbedResp
+				item.html = fallbackEmbedResp
 			}
 		}
 

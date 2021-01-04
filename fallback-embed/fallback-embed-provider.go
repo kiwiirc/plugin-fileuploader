@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -57,13 +58,13 @@ func (f *FallbackEmbed) ParseProviders(buf io.Reader) error {
 }
 
 // Get returns html string
-func (f *FallbackEmbed) Get(url string, width int, height int) (html string, err error) {
-	if !f.ValidURL(url) {
+func (f *FallbackEmbed) Get(wantedURL string, width int, height int) (html string, err error) {
+	if !f.ValidURL(wantedURL) {
 		return
 	}
 
 	// Do replacements
-	reqURL := strings.Replace(f.providerURL, "{url}", url, 1)
+	reqURL := strings.Replace(f.providerURL, "{url}", url.QueryEscape(wantedURL), 1)
 	reqURL = strings.Replace(reqURL, "{width}", strconv.Itoa(width), 1)
 	reqURL = strings.Replace(reqURL, "{height}", strconv.Itoa(height), 1)
 
@@ -96,7 +97,16 @@ func (f *FallbackEmbed) Get(url string, width int, height int) (html string, err
 		}
 	}
 
-	err = errors.New("Failed to get target json key")
+	// Check for error key in json response
+	if jsonVal, ok := resp["error"]; ok {
+		// Check error is string
+		if errorString, ok := jsonVal.(string); ok {
+			err = errors.New(errorString)
+			return
+		}
+	}
+
+	err = errors.New(`Fallback embed provider did not include a JSON property of "` + f.targetKey + `"`)
 	return
 }
 
