@@ -7,6 +7,7 @@ import '@uppy/dashboard/dist/style.css'
 import '@uppy/webcam/dist/style.css'
 
 import sidebarFileList from './components/SidebarFileList.vue'
+import webPreview from './components/WebPreview.vue'
 import { MiB } from './constants/data-size'
 import { showDashboardOnDragEnter } from './handlers/show-dashboard-on-drag-enter';
 import { uploadOnPaste } from './handlers/upload-on-paste'
@@ -24,6 +25,14 @@ kiwi.plugin('fileuploader', function (kiwiApi, log) {
     setDefaultSetting(kiwiApi, 'fileuploader.server', '/files')
     setDefaultSetting(kiwiApi, 'fileuploader.textPastePromptMinimumLines', 5)
     setDefaultSetting(kiwiApi, 'fileuploader.textPasteNeverPrompt', false)
+    setDefaultSetting(kiwiApi, 'fileuploader.webpreview.enable', true)
+    setDefaultSetting(kiwiApi, 'fileuploader.webpreview.url', '/embed?url={url}&center={center}&width={width}&height={height}')
+    setDefaultSetting(kiwiApi, 'fileuploader.webpreview.maxHeight', 400)
+    setDefaultSetting(kiwiApi, 'fileuploader.webpreview.maxWidth', 1000)
+
+    if (kiwiApi.state.setting('fileuploader.webpreview.enable')) {
+        kiwiApi.replaceModule('components/PreviewProvider', webPreview)
+    }
 
     // add button to input bar
     const uploadFileButton = document.createElement('i')

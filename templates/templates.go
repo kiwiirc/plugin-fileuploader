@@ -8,6 +8,7 @@ var Get = map[string]string{
             html, body {
                 margin: 0;
                 padding: 0;
+                overflow: hidden;
             }
             .kiwi-embed-image {
                 display: block;

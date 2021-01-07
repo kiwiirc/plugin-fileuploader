@@ -20,9 +20,10 @@ import (
 
 	"github.com/dyatlov/go-oembed/oembed"
 	"github.com/gin-gonic/gin"
+	"willnorris.com/go/imageproxy"
+
 	fallbackembed "github.com/kiwiirc/plugin-fileuploader/fallback-embed"
 	"github.com/kiwiirc/plugin-fileuploader/templates"
-	"willnorris.com/go/imageproxy"
 )
 
 type cacheItem struct {
