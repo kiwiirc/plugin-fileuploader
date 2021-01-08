@@ -16,8 +16,6 @@
 <script>
 'kiwi public';
 
-let embedlyTagIncluded = false;
-
 export default {
     props: ['url', 'showPin', 'iframeSandboxOptions'],
     data() {
@@ -38,12 +36,10 @@ export default {
         },
     },
     mounted() {
-        console.log('mounted');
         this.updateEmbed();
     },
     methods: {
         updateEmbed() {
-            console.log('updateEmbed');
             const iframe = this.$refs.previewFrame;
             if (!iframe) {
                 // No iframe to work with so nothing to update
@@ -59,7 +55,7 @@ export default {
             // Set the iframe url
             iframe.src = newUrl;
 
-            clearTimeout();
+            this.clearTimeout();
 
             this.iframeTimeout = this.setTimeout(() => {
                 this.$emit('setHeight', 'auto');
@@ -71,14 +67,11 @@ export default {
             this.maybeAddOrRemoveEventListener(true);
         },
         messageEventHandler(event) {
-            console.log('messageEventHandler');
             const iframe = this.$refs.previewFrame;
             if (!iframe || event.source !== iframe.contentWindow) {
                 // The message event did not come from our iframe ignore it
                 return;
             }
-
-            console.log('messageEventHandler', event.data);
 
             const data = event.data;
             if (data.error) {
