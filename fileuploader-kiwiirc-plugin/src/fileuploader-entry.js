@@ -31,7 +31,7 @@ kiwi.plugin('fileuploader', function (kiwiApi, log) {
     setDefaultSetting(kiwiApi, 'fileuploader.webpreview.maxWidth', 1000)
 
     if (kiwiApi.state.setting('fileuploader.webpreview.enable')) {
-        kiwiApi.replaceModule('components/PreviewProvider', webPreview)
+        kiwiApi.replaceModule('components/UrlEmbed', webPreview)
     }
 
     // add button to input bar
