@@ -2,7 +2,6 @@
     <div
         v-if="error"
         class="kiwi-webpreview-error"
-        :class="{'kiwi-mediaviewer-center': !showPin}"
     >{{ error }}</div>
     <iframe
         v-else
@@ -139,7 +138,14 @@ export default {
         border: 1px solid var(--brand-midtone);
     }
 
-    .kiwi-mediaviewer--pinned .kiwi-webpreview-frame {
+    .kiwi-main-mediaviewer .kiwi-webpreview-error {
+        margin: 10px 0;
+        position: relative;
+        left: 50%;
+        transform: translate(-50%, 0);
+    }
+
+    .kiwi-main-mediaviewer .kiwi-webpreview-frame {
         display: block;
         max-height: initial;
     }
