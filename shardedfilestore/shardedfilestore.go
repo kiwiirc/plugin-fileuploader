@@ -1,6 +1,6 @@
 // Package shardedfilestore is a modified version of the tusd/filestore implementation.
 // Splits file storage into subdirectories based on the hash prefix.
-// based on https://github.com/tus/tusd/blob/966f1d51639d3405b630e4c94c0b1d76a0f7475c/filestore/filestore.go
+// based on https://github.com/tus/tusd/blob/e138fc3e9e01ab8294a393ec0407eff38a708ddb/pkg/filestore/filestore.go
 package shardedfilestore
 
 import (
@@ -101,7 +101,11 @@ func (store ShardedFileStore) NewUpload(ctx context.Context, info handler.FileIn
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+
+	err = file.Close()
+	if err != nil {
+		return nil, err
+	}
 
 	upload := &fileUpload{
 		info:     info,
