@@ -10,6 +10,7 @@ server and then offer them as file downloads with a unique URL. The option to de
 after a set time period discourages users from using the server as a permanent file store.
 
 #### Dependencies
+* golang (https://golang.org/dl/ - for building as standalone)
 * yarn (https://yarnpkg.com/ - for the kiwiirc plugin UI)
 
 #### Downloading the file upload server's source code
@@ -25,6 +26,7 @@ $ go run .
 ```
 
 #### Building the server for production
+
 ```console
 $ go build
 ```
@@ -75,7 +77,7 @@ Add the plugin javascript file to your kiwiirc `config.json` and configure the s
 If you're running the fileuploader server as a webircgateway plugin, use the webircgateway hostname, e.g.
 
 ```json
-		"server": "https://ws.irc.example.com/files",
+	"server": "https://ws.irc.example.com/files",
 ```
 
 ## Database configuration

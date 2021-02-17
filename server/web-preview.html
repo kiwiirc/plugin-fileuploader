@@ -1,7 +1,4 @@
-package templates
-
-var Get = map[string]string{
-"webpreview": `<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
     <head>
         <style>
@@ -11,6 +8,9 @@ var Get = map[string]string{
                 overflow: hidden;
             }
             .kiwi-embed-image {
+                display: block;
+            }
+            #kiwi-embed-container > iframe {
                 display: block;
             }
             /* style.extras */
@@ -55,10 +55,6 @@ var Get = map[string]string{
         </script>
     </head>
     <body>
-        <div id="kiwi-embed-container">
-            {{body.html}}
-        </div>
+        <div id="kiwi-embed-container">{{body.html}}</div>
     </body>
 </html>
-`,
-}

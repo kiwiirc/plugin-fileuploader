@@ -22,8 +22,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"willnorris.com/go/imageproxy"
 
+	// required for embeding web-preview.html
+	_ "embed"
+
 	fallbackembed "github.com/kiwiirc/plugin-fileuploader/fallback-embed"
-	"github.com/kiwiirc/plugin-fileuploader/templates"
 )
 
 type cacheItem struct {
@@ -43,6 +45,7 @@ type imgWaiterItem struct {
 var httpClient *http.Client
 
 // HTML template
+//go:embed web-preview.html
 var template string
 var templateLock sync.RWMutex
 
@@ -64,14 +67,19 @@ var imgProxy *imageproxy.Proxy
 var isImage = regexp.MustCompile(`\.(jpe?g|png|gifv?)$`)
 
 func (serv *UploadServer) registerWebPreviewHandlers(r *gin.Engine, cfg Config) error {
-	serv.log.Info().
-		Msg("Starting web preview handlers")
-
 	httpClient = &http.Client{
 		Timeout: time.Second * 30,
 	}
 
 	// Check config defaults
+	webPreviewDisabled := cfg.WebPreview.WebPreviewDisabled
+	if webPreviewDisabled {
+		return nil
+	}
+
+	serv.log.Info().
+		Msg("Starting web preview handlers")
+
 	cacheCleanInterval := cfg.WebPreview.CacheCleanInterval.Duration
 	if cacheCleanInterval == time.Duration(0) {
 		cacheCleanInterval, _ = time.ParseDuration("15m")
@@ -475,12 +483,9 @@ func (serv *UploadServer) initFallbackProvider(fallbackProviderFile, fallbackPro
 }
 
 func (serv *UploadServer) initTemplates(templatesDir string) {
-	templatePath := path.Join(templatesDir, "webpreview.html")
+	templatePath := path.Join(templatesDir, "web-preview.html")
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
 		// No template file use content from binary
-		templateLock.Lock()
-		template, _ = templates.Get["webpreview"]
-		templateLock.Unlock()
 		return
 	}
 

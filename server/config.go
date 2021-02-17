@@ -49,6 +49,7 @@ type Config struct {
 
 	// WebPreview config options
 	WebPreview struct {
+		WebPreviewDisabled bool
 		OembedProviderFile string
 		TemplatesDirectory string
 		CacheMaxAge        duration
