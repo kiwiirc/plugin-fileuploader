@@ -1,7 +1,6 @@
 const path = require('path')
 const VueLoaderPlugin = require('vue-loader/lib/plugin')
 const CompressionPlugin = require('compression-webpack-plugin')
-const BrotliPlugin = require('brotli-webpack-plugin')
 const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 
 const makeSourceMap = process.argv.indexOf('--srcmap') > -1;
@@ -12,6 +11,7 @@ module.exports = {
     entry: './src/fileuploader-entry.js',
     output: {
         filename: 'plugin-fileuploader.js',
+        path: path.resolve(__dirname, "dist"),
     },
     module: {
         rules: [
@@ -23,15 +23,6 @@ module.exports = {
                 test: /\.js$/,
                 exclude: /node_modules/,
                 loader: 'babel-loader',
-                query: {
-                    presets: [
-                        ['@babel/preset-env', {
-                            useBuiltIns: 'usage',
-                            corejs: 3,
-                            // debug: true,
-                        }],
-                    ],
-                },
             },
             {
                 test: /\.css$/,
@@ -48,15 +39,8 @@ module.exports = {
         new CompressionPlugin({
             test: shouldCompress,
         }),
-        new BrotliPlugin({
-            asset: '[path].br[query]',
-            test: shouldCompress,
-            threshold: 10240,
-            minRatio: 0.8,
-            deleteOriginalAssets: false,
-        }),
     ],
-    devtool: makeSourceMap ? 'source-map' : '',
+    devtool: makeSourceMap ? 'source-map' : undefined,
     devServer: {
         filename: 'plugin-fileuploader.js',
         contentBase: path.join(__dirname, 'dist'),
