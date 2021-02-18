@@ -43,7 +43,20 @@ Path = "./uploads.db"
 # Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 MaxAge = "24h" # 1 day
 IdentifiedMaxAge = "168h" # 1 week
+DeletedMaxAge = "720h" # 30 days
 CheckInterval = "5m"
+
+[WebPreview]
+OembedProviderFile = "oembed-providers.json"
+TemplatesDirectory = "templates"
+CacheMaxAge = "1h"
+CacheCleanInterval = "15m"
+
+# Fallback provider specific
+FallbackProviderDisabled = false
+FallbackProviderURL = "https://noembed.com/embed?url={url}"
+FallbackProviderFile = "fallback-providers.json"
+FallbackProviderJsonKey = "html"
 
 # If EXTJWT is supported by the gateway or network, a validated token with an account present (when
 # the user is authenticated to an irc services account) will use the IdentifiedMaxAge setting above

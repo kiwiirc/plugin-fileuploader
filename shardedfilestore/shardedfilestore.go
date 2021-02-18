@@ -200,7 +200,7 @@ func RemoveWithDirs(path string, basePath string) (err error) {
 			return err
 		}
 
-		empty, err := isDirEmpty(parent);
+		empty, err := isDirEmpty(parent)
 		if empty {
 			err = os.Remove(parent)
 		}
@@ -431,14 +431,28 @@ func (store *ShardedFileStore) FinishUpload(id string) error {
 	newPath := store.completeBinPath(hash)
 	os.MkdirAll(filepath.Dir(newPath), defaultDirectoryPerm)
 	oldPath := store.incompleteBinPath(id)
-	err = os.Rename(oldPath, newPath)
-	if err != nil {
-		store.log.Error().
-			Err(err).
-			Str("oldPath", oldPath).
-			Str("newPath", newPath).
-			Msg("Failed to rename")
+
+	if _, err := os.Stat(newPath); err != nil {
+		// file needs moving to the sharded filestore
+		err = os.Rename(oldPath, newPath)
+		if err != nil {
+			store.log.Error().
+				Err(err).
+				Str("oldPath", oldPath).
+				Str("newPath", newPath).
+				Msg("Failed to rename")
+		}
+	} else {
+		// file already exists just remove the tempoary upload
+		err = os.Remove(oldPath)
+		if err != nil {
+			store.log.Error().
+				Err(err).
+				Str("oldPath", oldPath).
+				Msg("Failed to remove")
+		}
 	}
+
 	return err
 }
 
@@ -465,8 +479,8 @@ func isDirEmpty(path string) (bool, error) {
 	defer f.Close()
 
 	_, err = f.Readdirnames(1)
-    if err == io.EOF {
-        return true, nil
-    }
-    return false, err
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, err
 }

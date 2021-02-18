@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"sync"
 
@@ -18,6 +19,7 @@ import (
 type UploadServer struct {
 	DBConn *db.DatabaseConnection
 	Router *gin.Engine
+	ctx    *RunContext
 
 	cfg                 Config
 	log                 *zerolog.Logger
@@ -66,10 +68,14 @@ func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 		serv.store,
 		serv.cfg.Expiration.MaxAge.Duration,
 		serv.cfg.Expiration.IdentifiedMaxAge.Duration,
+		serv.cfg.Expiration.DeletedMaxAge.Duration,
 		serv.cfg.Expiration.CheckInterval.Duration,
 		serv.cfg.JwtSecretsByIssuer,
 		serv.log,
 	)
+
+	// If this fails to start it will log its own errors and not register any handlers
+	serv.registerWebPreviewHandlers(serv.Router, serv.cfg)
 
 	err := serv.registerTusHandlers(serv.Router, serv.store)
 	if err != nil {
@@ -104,7 +110,7 @@ func (serv *UploadServer) Shutdown() {
 
 	// wait for all requests to finish
 	if serv.httpServer != nil {
-		serv.httpServer.Shutdown(nil)
+		serv.httpServer.Shutdown(context.TODO())
 	}
 
 	// stop running FileStore GC cycles

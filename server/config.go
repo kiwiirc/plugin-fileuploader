@@ -41,10 +41,26 @@ type Config struct {
 	Expiration struct {
 		MaxAge           duration
 		IdentifiedMaxAge duration
+		DeletedMaxAge    duration
 		CheckInterval    duration
 	}
 	JwtSecretsByIssuer map[string]string
 	Loggers            []LoggerConfig
+
+	// WebPreview config options
+	WebPreview struct {
+		WebPreviewDisabled bool
+		OembedProviderFile string
+		TemplatesDirectory string
+		CacheMaxAge        duration
+		CacheCleanInterval duration
+
+		// Fallback provider configuration
+		FallbackProviderDisabled bool
+		FallbackProviderURL      string
+		FallbackProviderFile     string
+		FallbackProviderJsonKey  string
+	}
 }
 
 func NewConfig() *Config {
