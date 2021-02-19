@@ -3,8 +3,9 @@ package events
 import (
 	"sync"
 
-	"github.com/tus/tusd"
 	"github.com/tus/tusd/cmd/tusd/cli/hooks"
+	"github.com/tus/tusd/pkg/handler"
+	tusd "github.com/tus/tusd/pkg/handler"
 )
 
 // how many events can be unread by a listener before everything starts to block
@@ -76,13 +77,13 @@ func (b *TusEventBroadcaster) readLoop(handler *tusd.UnroutedHandler) {
 	}
 }
 
-func (b *TusEventBroadcaster) broadcast(hookType hooks.HookType, info tusd.FileInfo) {
+func (b *TusEventBroadcaster) broadcast(hookType hooks.HookType, hookEvent handler.HookEvent) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	event := &TusEvent{
 		Type: hookType,
-		Info: info,
+		Info: hookEvent.Upload,
 	}
 
 	for _, l := range b.listeners {

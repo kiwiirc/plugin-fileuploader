@@ -20,6 +20,7 @@ import { setDefaultSetting } from './utils/set-default-setting'
 
 kiwi.plugin('fileuploader', function (kiwiApi, log) {
     // default settings
+    setDefaultSetting(kiwiApi, 'fileuploader.allowedFileTypes', null)
     setDefaultSetting(kiwiApi, 'fileuploader.maxFileSize', 10 * MiB)
     setDefaultSetting(kiwiApi, 'fileuploader.server', '/files')
     setDefaultSetting(kiwiApi, 'fileuploader.textPastePromptMinimumLines', 5)
