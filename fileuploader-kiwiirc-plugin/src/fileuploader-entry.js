@@ -5,6 +5,8 @@ import 'core-js/features/array/iterator'
 import '@uppy/core/dist/style.css'
 import '@uppy/dashboard/dist/style.css'
 import '@uppy/webcam/dist/style.css'
+import '@uppy/audio/dist/style.css'
+import '@uppy/image-editor/dist/style.css'
 
 import sidebarFileList from './components/SidebarFileList.vue'
 import { MiB } from './constants/data-size'

@@ -2,6 +2,8 @@ import Uppy from '@uppy/core'
 import Dashboard from '@uppy/dashboard'
 import Tus from '@uppy/tus'
 import Webcam from '@uppy/webcam'
+import Audio from '@uppy/audio'
+import ImageEditor from '@uppy/image-editor'
 
 import { KiB } from './constants/data-size'
 import acquireExtjwtBeforeUpload from './handlers/uppy/acquire-extjwt-before-upload'
@@ -45,11 +47,15 @@ export default function instantiateUppy({
         ...uppyOptions,
     }
 
-    const uppy = Uppy(effectiveUppyOpts)
+    const uppy = new Uppy(effectiveUppyOpts)
         .use(Dashboard, effectiveDashboardOpts)
         .use(Webcam, { target: Dashboard })
+        .use(Audio, { target: Dashboard })
+        .use(ImageEditor, {
+            target: Dashboard,
+            quality: 1,
+        })
         .use(Tus, effectiveTusOpts)
-        .run()
 
     handlerContext.uppy = uppy // needs reference to uppy which didn't exist until now
 

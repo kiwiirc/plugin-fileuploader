@@ -42,8 +42,6 @@ module.exports = {
     ],
     devtool: makeSourceMap ? 'source-map' : undefined,
     devServer: {
-        filename: 'plugin-fileuploader.js',
-        contentBase: path.join(__dirname, 'dist'),
         compress: true,
         host: process.env.HOST || 'localhost',
         port: process.env.PORT || 41040,
