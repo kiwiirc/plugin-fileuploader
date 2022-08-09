@@ -1,16 +1,24 @@
-const path = require('path')
-const VueLoaderPlugin = require('vue-loader/lib/plugin')
-const CompressionPlugin = require('compression-webpack-plugin')
-const BrotliPlugin = require('brotli-webpack-plugin')
-const { CleanWebpackPlugin } = require('clean-webpack-plugin')
+const path = require('path');
+const VueLoaderPlugin = require('vue-loader/lib/plugin');
+const CompressionPlugin = require('compression-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 
-const shouldCompress = /\.(js|css|html|svg)(\.map)?$/
+const ConvertLocalesPlugin = require('./build/convert-locales');
+
+const makeSourceMap = process.argv.indexOf('--srcmap') > -1;
+const shouldCompress = /\.(js|css|html|svg)(\.map)?$/;
 
 module.exports = {
     mode: 'production',
     entry: './src/fileuploader-entry.js',
     output: {
         filename: 'plugin-fileuploader.js',
+        path: path.resolve(__dirname, 'dist'),
+    },
+    resolve: {
+        alias: {
+            '@': path.resolve(__dirname, 'src'),
+        },
     },
     module: {
         rules: [
@@ -22,15 +30,6 @@ module.exports = {
                 test: /\.js$/,
                 exclude: /node_modules/,
                 loader: 'babel-loader',
-                query: {
-                    presets: [
-                        ['@babel/preset-env', {
-                            useBuiltIns: 'usage',
-                            corejs: 3,
-                            // debug: true,
-                        }],
-                    ],
-                },
             },
             {
                 test: /\.css$/,
@@ -42,32 +41,34 @@ module.exports = {
         ],
     },
     plugins: [
-        new CleanWebpackPlugin,
-        new VueLoaderPlugin,
+        new CleanWebpackPlugin(),
+        new ConvertLocalesPlugin(),
+        new VueLoaderPlugin(),
         new CompressionPlugin({
             test: shouldCompress,
         }),
-        new BrotliPlugin({
-            asset: '[path].br[query]',
-            test: shouldCompress,
-            threshold: 10240,
-            minRatio: 0.8,
-            deleteOriginalAssets: false,
-        }),
     ],
-    devtool: 'source-map',
+    devtool: makeSourceMap ? 'source-map' : undefined,
     devServer: {
-        filename: 'plugin-fileuploader.js',
-        contentBase: path.join(__dirname, 'dist'),
+        static: {
+            directory: path.join(__dirname, 'dist'),
+            watch: false,
+        },
         compress: true,
         host: process.env.HOST || 'localhost',
-        port: process.env.PORT || 41040,
+        port: process.env.PORT || 9001,
+        headers: {
+            // required for loading locales with XMLHttpRequest
+            'Access-Control-Allow-Origin': '*',
+        },
     },
     optimization: {
         minimize: true,
     },
     performance: {
+        maxAssetSize: 700000,
+        maxEntrypointSize: 700000,
         assetFilter: assetFilename =>
-          !assetFilename.match(/\.map(\.(gz|br))?$/),
+            !assetFilename.match(/\.map(\.(gz|br))?$/),
     },
-}
+};
