@@ -1,6 +1,8 @@
 package shardedfilestore
 
 import (
+	"fmt"
+
 	migrate "github.com/rubenv/sql-migrate"
 )
 
@@ -65,6 +67,34 @@ func (store *ShardedFileStore) initDB() {
 					`
 					INSERT INTO new_uploads(id, uploader_ip, sha256sum, created_at, deleted)
 						SELECT id, uploader_ip, sha256sum, created_at, deleted
+						FROM uploads
+					;`,
+					`DROP TABLE uploads;`,
+					`ALTER TABLE new_uploads RENAME TO uploads;`,
+				},
+			},
+			{
+				Id: "5",
+				Up: []string{
+					`
+					CREATE TABLE new_uploads(
+						id VARCHAR(36) PRIMARY KEY,
+						uploader_ip VARCHAR(45),
+						sha256sum BLOB,
+						created_at INTEGER(8),
+						expires_at INTEGER(8),
+						deleted INTEGER(1) DEFAULT 0 NOT NULL,
+						jwt_account TEXT DEFAULT '' NOT NULL,
+						jwt_issuer TEXT DEFAULT '' NOT NULL
+					);`,
+					`
+					INSERT INTO new_uploads(id, uploader_ip, sha256sum, created_at, deleted, jwt_account, jwt_issuer, expires_at)
+						SELECT id, uploader_ip, sha256sum, created_at, deleted,
+						CASE WHEN jwt_account IS NULL THEN '' ELSE jwt_account END,
+						CASE WHEN jwt_issuer IS NULL THEN '' ELSE jwt_issuer END,
+						CASE WHEN jwt_account IS NOT NULL THEN created_at + ` + fmt.Sprintf("%.0f", store.ExpireIdentifiedTime.Seconds()) + `
+						ELSE created_at + ` + fmt.Sprintf("%.0f", store.ExpireTime.Seconds()) + ` END
+					 	as expires_at
 						FROM uploads
 					;`,
 					`DROP TABLE uploads;`,

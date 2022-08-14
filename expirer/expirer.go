@@ -8,24 +8,18 @@ import (
 )
 
 type Expirer struct {
-	ticker             *time.Ticker
-	store              *shardedfilestore.ShardedFileStore
-	maxAge             time.Duration
-	identifiedMaxAge   time.Duration
-	jwtSecretsByIssuer map[string]string
-	quitChan           chan struct{} // closes when ticker has been stopped
-	log                *zerolog.Logger
+	ticker   *time.Ticker
+	store    *shardedfilestore.ShardedFileStore
+	quitChan chan struct{} // closes when ticker has been stopped
+	log      *zerolog.Logger
 }
 
-func New(store *shardedfilestore.ShardedFileStore, maxAge, identifiedMaxAge, checkInterval time.Duration, jwtSecretsByIssuer map[string]string, log *zerolog.Logger) *Expirer {
+func New(store *shardedfilestore.ShardedFileStore, checkInterval time.Duration, log *zerolog.Logger) *Expirer {
 	expirer := &Expirer{
-		ticker:             time.NewTicker(checkInterval),
-		store:              store,
-		maxAge:             maxAge,
-		identifiedMaxAge:   identifiedMaxAge,
-		jwtSecretsByIssuer: jwtSecretsByIssuer,
-		quitChan:           make(chan struct{}),
-		log:                log,
+		ticker:   time.NewTicker(checkInterval),
+		store:    store,
+		quitChan: make(chan struct{}),
+		log:      log,
 	}
 
 	go func() {
@@ -60,7 +54,16 @@ func (expirer *Expirer) gc(t time.Time) {
 		Str("event", "gc_tick").
 		Msg("Filestore GC tick")
 
-	expiredIds, err := expirer.getExpired()
+	var expiredIds []string
+	err := expirer.store.DBConn.DB.Select(&expiredIds, `
+		SELECT id
+		FROM uploads
+		WHERE deleted = 0 AND (
+			expires_at <= ? OR (expires_at IS NULL AND created_at <= ?)
+		)`,
+		time.Now().Unix(),
+		time.Now().Unix()-86400, // 1 day
+	)
 	if err != nil {
 		expirer.log.Error().
 			Err(err).
@@ -81,37 +84,4 @@ func (expirer *Expirer) gc(t time.Time) {
 			Str("id", id).
 			Msg("Terminated upload id")
 	}
-}
-
-func (expirer *Expirer) getExpired() (expiredIds []string, err error) {
-	switch expirer.store.DBConn.DBConfig.DriverName {
-	case "sqlite3":
-		err = expirer.store.DBConn.DB.Select(&expiredIds, `
-			SELECT id FROM uploads
-			WHERE
-				CAST(strftime('%s', 'now') AS INTEGER) -- current time
-				>=
-				created_at + (CASE WHEN jwt_account IS NULL THEN $1 ELSE $2 END) -- expiration time
-			AND deleted != 1
-			`,
-			expirer.maxAge.Seconds(),
-			expirer.identifiedMaxAge.Seconds(),
-		)
-	case "mysql":
-		err = expirer.store.DBConn.DB.Select(&expiredIds, `
-			SELECT id FROM uploads
-			WHERE
-				UNIX_TIMESTAMP() -- current time
-				>=
-				created_at + (CASE WHEN jwt_account IS NULL THEN ? ELSE ? END) -- expiration time
-			AND deleted != 1
-			`,
-			expirer.maxAge.Seconds(),
-			expirer.identifiedMaxAge.Seconds(),
-		)
-	default:
-		panic("Unhandled database driver")
-	}
-
-	return
 }
