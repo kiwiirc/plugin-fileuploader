@@ -1,6 +1,6 @@
 const path = require('path');
-const VueLoaderPlugin = require('vue-loader/lib/plugin');
 const CompressionPlugin = require('compression-webpack-plugin');
+const { VueLoaderPlugin } = require('vue-loader')
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 
 const ConvertLocalesPlugin = require('./build/convert-locales');

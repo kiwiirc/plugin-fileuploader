@@ -5,7 +5,7 @@ const pluginName = 'ConvertLocalesPlugin';
 
 class ConvertLocalesPlugin {
     apply(compiler) {
-        compiler.hooks.emit.tap(pluginName, (compilation) => {
+        compiler.hooks.emit.tap(pluginName, async (compilation) => {
             const outputDir = path.resolve(__dirname, compilation.options.output.path, 'plugin-fileuploader/locales/uppy/');
             const nodeDir = path.resolve(__dirname, '../node_modules');
             const sourceDir = path.resolve(__dirname, nodeDir, '@uppy/locales/lib');
@@ -16,8 +16,8 @@ class ConvertLocalesPlugin {
             for (let i = 0; i < files.length; i++) {
                 const srcFile = files[i];
                 const outFile = path.resolve(__dirname, outputDir, srcFile.toLowerCase() + 'on');
-                const locale = require(path.resolve(__dirname, sourceDir, srcFile));
-                fs.writeFileSync(outFile, JSON.stringify(locale.strings, null, 4));
+                const locale = await import('file://' + path.resolve(__dirname, sourceDir, srcFile));
+                fs.writeFileSync(outFile, JSON.stringify(locale.default.strings, null, 4));
             }
         });
     }
