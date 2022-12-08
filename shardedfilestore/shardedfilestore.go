@@ -78,16 +78,17 @@ func (store ShardedFileStore) UseIn(composer *handler.StoreComposer) {
 func (store ShardedFileStore) NewUpload(ctx context.Context, info handler.FileInfo) (handler.Upload, error) {
 	var err error
 
-	id := Uid()
-	binPath := store.binPath(id)
-	info.ID = id
+	if info.ID == "" {
+		info.ID = Uid()
+	}
+	binPath := store.binPath(info.ID)
 	info.Storage = map[string]string{
 		"Type": "filestore",
 		"Path": binPath,
 	}
 
 	// Create the directory stucture if needed
-	err = os.MkdirAll(store.metaDir(id), defaultDirectoryPerm)
+	err = os.MkdirAll(store.metaDir(info.ID), defaultDirectoryPerm)
 	if err != nil {
 		return nil, err
 	}
@@ -103,14 +104,14 @@ func (store ShardedFileStore) NewUpload(ctx context.Context, info handler.FileIn
 	// create record in uploads table
 	err = db.UpdateRow(store.DBConn.DB,
 		`INSERT INTO uploads(id, created_at, uploader_ip, jwt_account, jwt_issuer) VALUES (?, ?, ?, ?, ?)`,
-		id, time.Now().Unix(), remoteIP, info.MetaData["account"], info.MetaData["issuer"],
+		info.ID, time.Now().Unix(), remoteIP, info.MetaData["account"], info.MetaData["issuer"],
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create .bin file with no content
-	file, err := os.OpenFile(store.binPath(id), os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+	file, err := os.OpenFile(binPath, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
 	if err != nil {
 		return nil, err
 	}
@@ -123,8 +124,8 @@ func (store ShardedFileStore) NewUpload(ctx context.Context, info handler.FileIn
 	upload := &fileUpload{
 		info:     info,
 		store:    store,
-		infoPath: store.infoPath(id),
-		binPath:  store.binPath(id),
+		infoPath: store.infoPath(info.ID),
+		binPath:  binPath,
 	}
 
 	// writeInfo creates the file by itself if necessary
