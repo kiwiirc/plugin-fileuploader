@@ -54,7 +54,7 @@ kiwi.plugin('fileuploader', function(kiwiApi, log) {
     }
 
     // set up main uppy object
-    const tokenManager = new TokenManager();
+    const tokenManager = new TokenManager(kiwiApi);
     const { uppy, dashboard } = instantiateUppy({
         kiwiApi,
         tokenManager,
