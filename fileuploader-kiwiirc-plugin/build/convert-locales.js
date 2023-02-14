@@ -5,7 +5,7 @@ const pluginName = 'ConvertLocalesPlugin';
 
 class ConvertLocalesPlugin {
     apply(compiler) {
-        compiler.hooks.emit.tap(pluginName, async (compilation) => {
+        compiler.hooks.emit.tap(pluginName, async(compilation) => {
             const outputDir = path.resolve(__dirname, compilation.options.output.path, 'plugin-fileuploader/locales/uppy/');
             const nodeDir = path.resolve(__dirname, '../node_modules');
             const sourceDir = path.resolve(__dirname, nodeDir, '@uppy/locales/lib');

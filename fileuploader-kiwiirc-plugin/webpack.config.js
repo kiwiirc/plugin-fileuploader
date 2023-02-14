@@ -1,6 +1,6 @@
 const path = require('path');
 const CompressionPlugin = require('compression-webpack-plugin');
-const { VueLoaderPlugin } = require('vue-loader')
+const { VueLoaderPlugin } = require('vue-loader');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 
 const ConvertLocalesPlugin = require('./build/convert-locales');
@@ -66,8 +66,8 @@ module.exports = {
         minimize: true,
     },
     performance: {
-        maxAssetSize: 700000,
-        maxEntrypointSize: 700000,
+        maxAssetSize: 1024000,
+        maxEntrypointSize: 1024000,
         assetFilter: assetFilename =>
             !assetFilename.match(/\.map(\.(gz|br))?$/),
     },

@@ -9,7 +9,7 @@ export default class TokenManager {
     get(network) {
         const cachedTokenOrPromise = this.cache.get(network);
         if (cachedTokenOrPromise) {
-            const {tokenOrPromise, acquiredAt} = cachedTokenOrPromise;
+            const { tokenOrPromise, acquiredAt } = cachedTokenOrPromise;
             if (tokenOrPromise instanceof Promise) {
                 // Token not yet resolved
                 return tokenOrPromise;

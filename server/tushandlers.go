@@ -20,12 +20,12 @@ import (
 	tusd "github.com/tus/tusd/pkg/handler"
 )
 
-func customizedCors(allowedOrigins []string) gin.HandlerFunc {
+func customizedCors(serv *UploadServer) gin.HandlerFunc {
 	// convert slice values to keys of map for "contains" test
-	originSet := make(map[string]struct{}, len(allowedOrigins))
+	originSet := make(map[string]struct{}, len(serv.cfg.Server.CorsOrigins))
 	allowAll := false
 	exists := struct{}{}
-	for _, origin := range allowedOrigins {
+	for _, origin := range serv.cfg.Server.CorsOrigins {
 		if origin == "*" {
 			allowAll = true
 			continue
@@ -44,6 +44,7 @@ func customizedCors(allowedOrigins []string) gin.HandlerFunc {
 			respHeader.Set("Access-Control-Allow-Origin", origin)
 		} else {
 			respHeader.Del("Access-Control-Allow-Origin")
+			serv.log.Warn().Str("origin", origin).Msg("Unknown cors origin")
 		}
 
 		// lets the user-agent know the response can vary depending on the origin of the request.
@@ -139,7 +140,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 
 	rg := r.Group(routePrefix)
 	rg.Use(tusdMiddleware)
-	rg.Use(customizedCors(serv.cfg.Server.CorsOrigins))
+	rg.Use(customizedCors(serv))
 	rg.Use(serv.fileuploaderMiddleware())
 	rg.POST("", serv.postFile(handler))
 
