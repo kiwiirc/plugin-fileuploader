@@ -95,7 +95,7 @@ func createMultiLogger(loggerConfigs []LoggerConfig) (*zerolog.Logger, error) {
 		url := loggerCfg.Output.URL
 		switch url.Scheme {
 		case "file":
-			file, err := os.OpenFile(url.Path, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0640)
+			file, err := os.OpenFile(url.Path + url.Opaque, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0640)
 			if err != nil {
 				return nil, err
 			}
