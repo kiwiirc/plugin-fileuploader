@@ -38,13 +38,16 @@ func customizedCors(serv *UploadServer) gin.HandlerFunc {
 		respHeader := c.Writer.Header()
 
 		// only allow the origin if it's in the list from the config
-		if allowAll {
+		if allowAll && origin != "" {
 			respHeader.Set("Access-Control-Allow-Origin", origin)
 		} else if _, ok := originSet[origin]; ok {
 			respHeader.Set("Access-Control-Allow-Origin", origin)
 		} else {
 			respHeader.Del("Access-Control-Allow-Origin")
-			serv.log.Warn().Str("origin", origin).Msg("Unknown cors origin")
+			if c.Request.Method != "HEAD" && c.Request.Method != "GET" {
+				// Don't log unknown cors origin for HEAD or GET requests
+				serv.log.Warn().Str("origin", origin).Msg("Unknown cors origin")
+			}
 		}
 
 		// lets the user-agent know the response can vary depending on the origin of the request.
