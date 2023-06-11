@@ -322,7 +322,6 @@ func (upload *fileUpload) FinishUpload(ctx context.Context) error {
 				Msg("Error with pre-finish command")
 
 			upload.store.log.Debug().
-				Err(err).
 				Str("stdout", stdOut.String()).
 				Str("stderr", stdErr.String()).
 				Msg("Error with pre-finish command")
