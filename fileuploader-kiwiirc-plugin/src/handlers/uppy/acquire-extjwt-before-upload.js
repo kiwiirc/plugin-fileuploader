@@ -1,8 +1,9 @@
-export default function acquireExtjwtBeforeUpload(tokenManager) {
-    const handlerContext = {};
-
-    function handleBeforeUpload(files) {
+export default function acquireExtjwtBeforeUpload(uppy, tokenManager) {
+    function handleBeforeUpload(fileIDs) {
+        console.log('pre-processor');
         const awaitingPromises = new Set();
+
+        const files = fileIDs.map((id) => uppy.getFile(id));
 
         for (const fileObj of Object.values(files)) {
             const network = fileObj.kiwiFileUploaderTargetBuffer.getNetwork();
@@ -21,17 +22,11 @@ export default function acquireExtjwtBeforeUpload(tokenManager) {
 
         if (awaitingPromises.size) {
             // Wait for the unresolved promises then resume uploading
-            Promise.all(awaitingPromises.values()).then(() => {
+            return Promise.all(awaitingPromises.values()).then(() => {
                 console.debug('Token acquisition complete. Restarting upload.');
-                // Now all tokens are ready and waiting uppy.upload()
-                // will cause this function to be executed again
-                handlerContext.uppy.upload();
             });
-
-            // Prevent uploads from starting until promises are resolved
-            return false;
         }
     }
 
-    return { handlerContext, handleBeforeUpload };
+    return handleBeforeUpload;
 }

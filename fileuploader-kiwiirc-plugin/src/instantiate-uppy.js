@@ -30,8 +30,6 @@ export default function instantiateUppy({
         ...tusOptions,
     };
 
-    const { handlerContext, handleBeforeUpload } = acquireExtjwtBeforeUpload(tokenManager);
-
     const effectiveUppyOpts = {
         autoProceed: false,
         onBeforeFileAdded: (file) => {
@@ -45,7 +43,6 @@ export default function instantiateUppy({
             file.kiwiFileUploaderTargetBuffer = buffer;
             return true;
         },
-        onBeforeUpload: handleBeforeUpload,
         restrictions: {
             maxFileSize: kiwiApi.state.setting('fileuploader.maxFileSize'),
             allowedFileTypes: kiwiApi.state.setting('fileuploader.allowedFileTypes'),
@@ -63,7 +60,9 @@ export default function instantiateUppy({
         })
         .use(Tus, effectiveTusOpts);
 
-    handlerContext.uppy = uppy; // needs reference to uppy which didn't exist until now
+    uppy.addPreProcessor(
+        acquireExtjwtBeforeUpload(uppy, tokenManager)
+    );
 
     const dashboard = uppy.getPlugin('Dashboard');
 
