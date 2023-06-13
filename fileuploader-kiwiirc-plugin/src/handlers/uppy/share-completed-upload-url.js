@@ -1,6 +1,8 @@
 import { friendlyUrl } from '../../utils/friendly-url';
 import { decodeMetadata } from '../../utils/decode-metadata';
 
+import * as config from '@/config.js';
+
 export function shareCompletedUploadUrl(kiwiApi) {
     return function handleUploadSuccess(file, response) {
         const url = friendlyUrl(file, response);
@@ -41,7 +43,7 @@ function sendUploadEvent(kiwiApi, url, file, headResp) {
         tagData.expires = parseInt(metadata.expires, 10);
     }
 
-    const msgTemplate = kiwiApi.state.getSetting('settings.fileuploader.uploadMessage');
+    const msgTemplate = config.getSetting('uploadMessage');
     const message = msgTemplate.replace('%URL%', url);
 
     buffer.say(message, {

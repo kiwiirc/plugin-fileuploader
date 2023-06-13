@@ -56,11 +56,11 @@
 /* global kiwi:true */
 
 import { bytesReadable, durationReadable } from '@/utils/readable';
+import * as config from '@/config.js';
 
 export default {
     data() {
         return {
-            settings: kiwi.state.setting('fileuploader'),
             messageWatcher: null,
             bufferFiles: [],
             updateFilesDebounced: null,
@@ -90,7 +90,7 @@ export default {
     created() {
         this.updateFilesDebounced = _.debounce(this.updateFiles, 1000);
 
-        let srvUrl = kiwi.state.getSetting('settings.fileuploader.server');
+        let srvUrl = config.getSetting('server');
         if (srvUrl[srvUrl.length - 1] !== '/') {
             srvUrl += '/';
         }
@@ -115,9 +115,7 @@ export default {
         },
         updateFiles() {
             const files = [];
-            const srvUrl = kiwi.state.getSetting(
-                'settings.fileuploader.server',
-            );
+            const srvUrl = config.getSetting('server');
             const messages = this.buffer.getMessages();
             const existingIds = [];
             for (let i = 0; i < messages.length; i++) {

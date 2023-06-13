@@ -3,10 +3,8 @@ import '@uppy/dashboard/dist/style.css';
 import '@uppy/webcam/dist/style.css';
 import '@uppy/audio/dist/style.css';
 import '@uppy/image-editor/dist/style.css';
-
 import sidebarFileList from './components/SidebarFileList.vue';
 import audioPlayerComponent from './components/AudioPlayer.vue';
-import { MiB } from './constants/data-size';
 import { showDashboardOnDragEnter } from './handlers/show-dashboard-on-drag-enter';
 import { uploadOnPaste } from './handlers/upload-on-paste';
 import { closeModalWhenUploadsCompleted } from './handlers/uppy/close-modal-when-uploads-completed';
@@ -16,27 +14,13 @@ import instantiateUppy from './instantiate-uppy';
 import instantiateUppyLocales from './instantiate-uppy-locales';
 import { createPromptUpload } from './prompt-upload';
 import TokenManager from './token-manager';
-import { setDefaultSetting } from './utils/set-default-setting';
 
-let scriptPath;
-
-(function() {
-    const scriptElements = document.getElementsByTagName('script');
-    const thisScriptSrc = scriptElements[scriptElements.length - 1].src;
-    scriptPath = thisScriptSrc.substring(0, thisScriptSrc.lastIndexOf('/') + 1);
-})();
+import * as config from '@/config.js';
 
 /* global kiwi:true */
 kiwi.plugin('fileuploader', function(kiwiApi, log) {
     // default settings
-    setDefaultSetting(kiwiApi, 'fileuploader.allowedFileTypes', null);
-    setDefaultSetting(kiwiApi, 'fileuploader.maxFileSize', 10 * MiB);
-    setDefaultSetting(kiwiApi, 'fileuploader.server', '/files/');
-    setDefaultSetting(kiwiApi, 'fileuploader.textPastePromptMinimumLines', 5);
-    setDefaultSetting(kiwiApi, 'fileuploader.textPasteNeverPrompt', false);
-    setDefaultSetting(kiwiApi, 'fileuploader.bufferInfoUploads', true);
-    setDefaultSetting(kiwiApi, 'fileuploader.localePath', '');
-    setDefaultSetting(kiwiApi, 'fileuploader.uploadMessage', 'Uploaded file: %URL%');
+    config.setDefaults();
 
     // add button to input bar
     const uploadFileButton = document.createElement('i');
@@ -44,7 +28,7 @@ kiwi.plugin('fileuploader', function(kiwiApi, log) {
     kiwiApi.addUi('input', uploadFileButton);
 
     // add sidebar panel
-    if (kiwiApi.state.setting('fileuploader.bufferInfoUploads')) {
+    if (config.getSetting('bufferInfoUploads')) {
         kiwiApi.addUi('about_buffer', sidebarFileList, { title: 'Shared Files' });
     }
 
@@ -56,7 +40,7 @@ kiwi.plugin('fileuploader', function(kiwiApi, log) {
         uploadFileButton,
     });
 
-    instantiateUppyLocales(kiwiApi, uppy, scriptPath);
+    instantiateUppyLocales(kiwiApi, uppy);
 
     const promptUpload = createPromptUpload({ kiwiApi, tokenManager });
     // expose plugin api

@@ -1,9 +1,11 @@
 import Translator from '@uppy/utils/lib/Translator';
 import DefaultLang from '@uppy/locales/lib/en_US.js';
 
+import * as config from '@/config.js';
+
 /* global _:true */
 
-export default function instantiateUppyLocales(kiwiApi, uppy, scriptPath) {
+export default function instantiateUppyLocales(kiwiApi, uppy) {
     function loadLocale(_lang) {
         let lang = (_lang || kiwiApi.i18n.language).split('-');
         if (lang.length !== 2) {
@@ -12,8 +14,8 @@ export default function instantiateUppyLocales(kiwiApi, uppy, scriptPath) {
         }
 
         const langUppy = lang.join('_').toLowerCase();
-        const localePathConfig = kiwiApi.state.getSetting('settings.fileuploader.localePath');
-        const localePathAuto = scriptPath + 'plugin-fileuploader/locales/uppy/%LANG%.json';
+        const localePathConfig = config.getSetting('localePath');
+        const localePathAuto = config.getBasePath() + 'plugin-fileuploader/locales/uppy/%LANG%.json';
         const localePath = localePathConfig || localePathAuto;
         const localeURL = localePath.replace('%LANG%', langUppy);
 

@@ -9,8 +9,9 @@ import prettierBytes from '@transloadit/prettier-bytes';
 import Bytes from 'bytes';
 import Wildcard from 'wildcard';
 
-import { KiB } from './constants/data-size';
 import acquireExtjwtBeforeUpload from './handlers/uppy/acquire-extjwt-before-upload';
+
+import * as config from '@/config.js';
 
 export default function instantiateUppy({
     kiwiApi,
@@ -24,17 +25,17 @@ export default function instantiateUppy({
         trigger: uploadFileButton,
         proudlyDisplayPoweredByUppy: false,
         closeModalOnClickOutside: true,
-        note: kiwiApi.state.setting('fileuploader.note'),
+        note: config.getSetting('note'),
         ...dashboardOptions,
     };
 
     const effectiveTusOpts = {
-        endpoint: kiwiApi.state.setting('fileuploader.server'),
-        chunkSize: 512 * KiB,
+        endpoint: config.getSetting('server'),
+        chunkSize: Bytes.parse('512KB'),
         ...tusOptions,
     };
 
-    const maxSizeTypesConfig = kiwiApi.state.setting('fileuploader.maxFileSizeTypes');
+    const maxSizeTypesConfig = config.getSetting('maxFileSizeTypes');
     const maxSizeTypes = Object.create(null);
 
     if (maxSizeTypesConfig) {
@@ -76,8 +77,8 @@ export default function instantiateUppy({
             return true;
         },
         restrictions: {
-            maxFileSize: Bytes.parse(kiwiApi.state.setting('fileuploader.maxFileSize')),
-            allowedFileTypes: kiwiApi.state.setting('fileuploader.allowedFileTypes'),
+            maxFileSize: Bytes.parse(config.getSetting('maxFileSize')),
+            allowedFileTypes: config.getSetting('allowedFileTypes'),
         },
         ...uppyOptions,
     };
