@@ -52,20 +52,27 @@ kiwi.plugin('fileuploader', function(kiwiApi, log) {
     // show uppy modal when files are pasted
     kiwiApi.on('buffer.paste', uploadOnPaste(kiwiApi, uppy, dashboard));
 
-    kiwiApi.on('message.new', (event, network, eventObj) => {
-        if (!event.message.tags || !event.message.tags['+kiwiirc.com/fileuploader']) {
-            return;
-        }
+    const messageHandler = (isNew) => {
+        return (event) => {
+            const message = event.message;
+            if (!message.tags || !message.tags['+kiwiirc.com/fileuploader']) {
+                return;
+            }
 
-        const fileInfo = kiwiApi.JSON5.parse(event.message.tags['+kiwiirc.com/fileuploader']);
-        if (!fileInfo.type || !fileInfo.type.startsWith('audio/')) {
-            return;
-        }
+            const fileInfo = kiwiApi.JSON5.parse(message.tags['+kiwiirc.com/fileuploader']);
+            if (!fileInfo.type || !fileInfo.type.startsWith('audio/')) {
+                return;
+            }
 
-        const message = event.message;
-        message.bodyTemplate = audioPlayerComponent;
-        console.log('message.new', event);
-    });
+            if (isNew) {
+                message.bodyTemplate = audioPlayerComponent;
+            } else {
+                message.embed.payload = '';
+            }
+        };
+    };
+    kiwiApi.on('message.new', messageHandler(true));
+    kiwiApi.on('message.prestyle', messageHandler(false));
 
     // send message with link to buffer when upload finishes
     uppy.on('upload-success', shareCompletedUploadUrl(kiwiApi));
