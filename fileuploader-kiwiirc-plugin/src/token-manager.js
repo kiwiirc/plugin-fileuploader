@@ -48,7 +48,6 @@ export default class TokenManager {
                     return;
                 }
 
-                console.log('extjwt', command, event, eventNetwork);
                 event.handled = true;
                 fullToken += event.params[event.params.length - 1];
                 if (event.params.length === 4) {

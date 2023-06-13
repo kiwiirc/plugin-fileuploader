@@ -1,6 +1,5 @@
 export default function acquireExtjwtBeforeUpload(uppy, tokenManager) {
     function handleBeforeUpload(fileIDs) {
-        console.log('pre-processor');
         const awaitingPromises = new Set();
 
         const files = fileIDs.map((id) => uppy.getFile(id));
