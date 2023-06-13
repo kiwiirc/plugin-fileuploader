@@ -1,7 +1,3 @@
-// polyfill globals for uppy on IE11
-import 'core-js/features/array/iterator';
-// import 'core-js/features/promise' // already included by kiwiirc
-
 import '@uppy/core/dist/style.css';
 import '@uppy/dashboard/dist/style.css';
 import '@uppy/webcam/dist/style.css';
