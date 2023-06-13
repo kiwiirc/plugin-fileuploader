@@ -9,6 +9,7 @@ import '@uppy/audio/dist/style.css';
 import '@uppy/image-editor/dist/style.css';
 
 import sidebarFileList from './components/SidebarFileList.vue';
+import audioPlayerComponent from './components/AudioPlayer.vue';
 import { MiB } from './constants/data-size';
 import { showDashboardOnDragEnter } from './handlers/show-dashboard-on-drag-enter';
 import { uploadOnPaste } from './handlers/upload-on-paste';
@@ -48,9 +49,7 @@ kiwi.plugin('fileuploader', function(kiwiApi, log) {
 
     // add sidebar panel
     if (kiwiApi.state.setting('fileuploader.bufferInfoUploads')) {
-        const sidebarComponent = new kiwiApi.Vue(sidebarFileList);
-        sidebarComponent.$mount();
-        kiwiApi.addUi('about_buffer', sidebarComponent.$el, { title: 'Shared Files' });
+        kiwiApi.addUi('about_buffer', sidebarFileList, { title: 'Shared Files' });
     }
 
     // set up main uppy object
@@ -72,6 +71,21 @@ kiwi.plugin('fileuploader', function(kiwiApi, log) {
 
     // show uppy modal when files are pasted
     kiwiApi.on('buffer.paste', uploadOnPaste(kiwiApi, uppy, dashboard));
+
+    kiwiApi.on('message.new', (event, network, eventObj) => {
+        if (!event.message.tags || !event.message.tags['+kiwiirc.com/fileuploader']) {
+            return;
+        }
+
+        const fileInfo = kiwiApi.JSON5.parse(event.message.tags['+kiwiirc.com/fileuploader']);
+        if (!fileInfo.type || !fileInfo.type.startsWith('audio/')) {
+            return;
+        }
+
+        const message = event.message;
+        message.bodyTemplate = audioPlayerComponent;
+        console.log('message.new', event);
+    });
 
     // send message with link to buffer when upload finishes
     uppy.on('upload-success', shareCompletedUploadUrl(kiwiApi));
