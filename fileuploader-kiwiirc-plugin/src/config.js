@@ -16,6 +16,9 @@ const defaultConfig = {
     bufferInfoUploads: true,
     allowedFileTypes: null,
     maxFileSizeTypes: null,
+    dashboardOptions: {},
+    tusOptions: {},
+    uppyOptions: {},
 };
 
 export function setDefaults() {

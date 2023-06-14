@@ -56,6 +56,7 @@ module.exports = {
         'vue/html-indent': ['error', 4],
         'vue/max-attributes-per-line': 0,
         'vue/multiline-html-element-content-newline': 0,
+        'vue/no-mutating-props': 0,
         'vue/no-unused-components': 0,
         'vue/no-v-html': 0,
         'vue/require-prop-types': 0,

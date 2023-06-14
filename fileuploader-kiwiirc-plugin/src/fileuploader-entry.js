@@ -38,6 +38,9 @@ kiwi.plugin('fileuploader', function(kiwiApi, log) {
         kiwiApi,
         tokenManager,
         uploadFileButton,
+        dashboardOptions: config.getSetting('dashboardOptions'),
+        tusOptions: config.getSetting('tusOptions'),
+        uppyOptions: config.getSetting('uppyOptions'),
     });
 
     instantiateUppyLocales(kiwiApi, uppy);
@@ -52,27 +55,36 @@ kiwi.plugin('fileuploader', function(kiwiApi, log) {
     // show uppy modal when files are pasted
     kiwiApi.on('buffer.paste', uploadOnPaste(kiwiApi, uppy, dashboard));
 
-    const messageHandler = (isNew) => {
-        return (event) => {
-            const message = event.message;
-            if (!message.tags || !message.tags['+kiwiirc.com/fileuploader']) {
-                return;
-            }
+    kiwiApi.on('message.new', (event) => {
+        const message = event.message;
+        if (!message.tags || !message.tags['+kiwiirc.com/fileuploader']) {
+            return;
+        }
 
+        try {
             const fileInfo = kiwiApi.JSON5.parse(message.tags['+kiwiirc.com/fileuploader']);
-            if (!fileInfo.type || !fileInfo.type.startsWith('audio/')) {
-                return;
-            }
+            message.fileuploader = {
+                hasError: false,
+                isAudio: false,
+                fileInfo,
+            };
 
-            if (isNew) {
+            if (fileInfo.type?.startsWith('audio/')) {
                 message.bodyTemplate = audioPlayerComponent;
-            } else {
-                message.embed.payload = '';
+                message.fileuploader.isAudio = true;
             }
-        };
-    };
-    kiwiApi.on('message.new', messageHandler(true));
-    kiwiApi.on('message.prestyle', messageHandler(false));
+        } catch (err) {
+            log.error('Failed to parse fileuploader message-tag', err);
+        }
+    });
+
+    kiwiApi.on('message.prestyle', (event) => {
+        const message = event.message;
+        if (!message.fileuploader?.isAudio) {
+            return;
+        }
+        message.embed.payload = '';
+    });
 
     // send message with link to buffer when upload finishes
     uppy.on('upload-success', shareCompletedUploadUrl(kiwiApi));
