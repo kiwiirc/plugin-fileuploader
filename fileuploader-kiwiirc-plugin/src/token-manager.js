@@ -1,116 +1,72 @@
-import isPromise from 'p-is-promise'
-
-import CacheLoader from './cache-loader'
-
-const seconds = 1000
-const minutes = 60 * seconds
-
-const ERR_UNKNOWNCOMMAND = 421
-
-const ErrExtJwtUnsupported = new Error('EXTJWT unsupported on this server/gateway')
-
-const UNSUPPORTED_TTL = 5 * minutes
+const seconds = 1000;
 
 export default class TokenManager {
-    constructor() {
-        this.unsupportedNetworks = new Map()
-        this.requestToken = this.requestToken.bind(this) // ?!?!
-        this.cacheLoader = new CacheLoader(this.requestToken, TokenManager.assertValid)
+    constructor(kiwiApi) {
+        this.kiwiApi = kiwiApi;
+        this.cache = new Map();
     }
 
     get(network) {
-        if (this.unsupportedNetworks.has(network)) {
-            if (new Date() - this.unsupportedNetworks.get(network) < UNSUPPORTED_TTL) {
-                return false // don't retry EXTJWT on unsupported servers
+        const cachedTokenOrPromise = this.cache.get(network);
+        if (cachedTokenOrPromise) {
+            const { tokenOrPromise, acquiredAt } = cachedTokenOrPromise;
+            if (tokenOrPromise instanceof Promise) {
+                // Token not yet resolved
+                return tokenOrPromise;
             }
+
+            // Check if the token is still valid
+            const now = new Date();
+            if (now - acquiredAt < 15 * seconds) {
+                // Token valid
+                return tokenOrPromise;
+            }
+
+            // Token expired
+            this.cache.delete(network);
         }
 
-        const maybePromise = this.cacheLoader.get(network)
+        // Cache does not have a valid entry for this network
+        const tokenPromise = this.getExtjwtToken(network);
 
-        if (isPromise(maybePromise)) {
-            const tokenRecordPromise = maybePromise
-            return tokenRecordPromise
-                .then(tokenRecord => tokenRecord.token)
-                .catch(err => {
-                    if (err === ErrExtJwtUnsupported) {
-                        return false
-                    }
-                    throw err
-                })
-        }
+        // Store the new token promise within the cache
+        this.cache.set(network, {
+            tokenOrPromise: tokenPromise,
+            acquiredAt: new Date(),
+        });
 
-        const tokenRecord = maybePromise
-        return tokenRecord.token
+        return tokenPromise;
     }
 
-    async requestToken(network) {
-        const thisTokenManager = this
+    getExtjwtToken(network) {
+        return new Promise((resolve) => {
+            let fullToken = '';
 
-        const respPromise = awaitMessage(
-            network.ircClient,
-            message => {
-                if (message.command === String(ERR_UNKNOWNCOMMAND) && message.params[1].toUpperCase() === 'EXTJWT') {
-                    throw ErrExtJwtUnsupported
+            const callback = (command, event, eventNetwork) => {
+                if (network !== eventNetwork) {
+                    // Not a token for this network
+                    return;
                 }
 
-                return message.command.toUpperCase() === 'EXTJWT' && message.params[0] === '*'
-            },
-            { timeout: 10 * seconds }
-        )
-
-        network.ircClient.raw('EXTJWT')
-
-        let resp
-        try {
-            resp = await respPromise
-        } catch (err) {
-            if (err === ErrExtJwtUnsupported) {
-                const unsupportedAt = new Date()
-                thisTokenManager.unsupportedNetworks.set(network, unsupportedAt)
-                console.debug('Network does not support EXTJWT:', network)
-            }
-            throw err
-        }
-
-        const acquiredAt = new Date()
-        const [target, token] = resp.params
-        return { token, acquiredAt }
-    }
-
-    static assertValid(tokenRecord) {
-        const { token, acquiredAt } = tokenRecord
-        const now = new Date()
-        if (now - acquiredAt > 15 * seconds) {
-            throw new Error(`Stale token: ${(now - acquiredAt) / 1000} seconds age exceeds 15 second limit`)
-        }
-    }
-}
-
-function awaitMessage(ircClient, matcher, { timeout } = { timeout: undefined }) {
-    const { connection } = ircClient
-    return new Promise((resolve, reject) => {
-        let timeoutHandle
-        if (timeout) {
-            timeoutHandle = setTimeout(() => {
-                connection.removeListener('message', callback)
-                reject(new Error('Timeout expired'))
-            }, timeout)
-        }
-
-        const callback = message => {
-            try {
-                if (matcher(message)) {
-                    connection.removeListener('message', callback)
-                    if (timeoutHandle) clearTimeout(timeoutHandle)
-                    resolve(message)
+                event.handled = true;
+                fullToken += event.params[event.params.length - 1];
+                if (event.params.length === 4) {
+                    // Incomplete token, it will continue in the next message
+                    return;
                 }
-            } catch (err) {
-                connection.removeListener('message', callback)
-                if (timeoutHandle) clearTimeout(timeoutHandle)
-                reject(err)
-            }
-        }
 
-        connection.on('message', callback)
-    })
+                this.kiwiApi.off('irc.raw.EXTJWT', callback);
+
+                // Replace the promise with the real token
+                const cachedPromise = this.cache.get(network);
+                cachedPromise.tokenOrPromise = fullToken;
+
+                // Resolve the promise
+                resolve();
+            };
+
+            this.kiwiApi.on('irc.raw.EXTJWT', callback);
+            network.ircClient.raw('EXTJWT', '*');
+        });
+    }
 }

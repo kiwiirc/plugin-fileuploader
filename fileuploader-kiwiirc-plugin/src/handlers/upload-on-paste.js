@@ -1,43 +1,43 @@
-import { getValidUploadTarget } from '../utils/get-valid-upload-target'
-import { numLines } from '../utils/num-lines'
+import { getValidUploadTarget } from '../utils/get-valid-upload-target';
+import { numLines } from '../utils/num-lines';
 
 export function uploadOnPaste(kiwiApi, uppy, dashboard) {
     return function handleBufferPaste(event) {
         // swallow error and ignore paste if no valid buffer to share to
         try {
-            getValidUploadTarget(kiwiApi)
+            getValidUploadTarget(kiwiApi);
         } catch (err) {
-            return
+            return;
         }
 
         // IE 11 puts the clipboardData on the window
-        const cbData = event.clipboardData || window.clipboardData
+        const cbData = event.clipboardData || window.clipboardData;
 
         if (!cbData) {
-            return
+            return;
         }
 
         // detect large text pastes, offer to create a file upload instead
-        const text = cbData.getData('text')
+        const text = cbData.getData('text');
         if (text) {
-            const promptDisabled = kiwiApi.state.setting('fileuploader.textPasteNeverPrompt')
+            const promptDisabled = kiwiApi.state.setting('fileuploader.textPasteNeverPrompt');
             if (promptDisabled) {
-                return
+                return;
             }
-            const minLines = kiwiApi.state.setting('fileuploader.textPastePromptMinimumLines')
-            const network = kiwiApi.state.getActiveNetwork()
+            const minLines = kiwiApi.state.setting('fileuploader.textPastePromptMinimumLines');
+            const network = kiwiApi.state.getActiveNetwork();
             const networkMaxLineLen =
-                network.ircClient.options.message_max_length
+                network.ircClient.options.message_max_length;
             if (text.length > networkMaxLineLen || numLines(text) >= minLines) {
                 const msg =
-                    'You pasted a lot of text.\nWould you like to upload as a file instead?'
+                    'You pasted a lot of text.\nWould you like to upload as a file instead?';
                 if (window.confirm(msg)) {
                     // stop IrcInput from ingesting the pasted text
-                    event.preventDefault()
-                    event.stopPropagation()
+                    event.preventDefault();
+                    event.stopPropagation();
 
                     // only if there are no other files waiting for user confirmation to upload
-                    const shouldAutoUpload = uppy.getFiles().length === 0
+                    const shouldAutoUpload = uppy.getFiles().length === 0;
 
                     uppy.addFile({
                         name: 'pasted.txt',
@@ -45,24 +45,26 @@ export function uploadOnPaste(kiwiApi, uppy, dashboard) {
                         data: new Blob([text], { type: 'text/plain' }),
                         source: 'Local',
                         isRemote: false,
-                    })
+                    });
 
                     if (shouldAutoUpload) {
-                        uppy.upload()
+                        uppy.upload();
+                    } else {
+                        dashboard.openModal();
                     }
-
-                    dashboard.openModal()
                 }
             }
+
+            return;
         }
 
         // ensure a file has been pasted
         if (!cbData.files || cbData.files.length <= 0) {
-            return
+            return;
         }
 
         // pass event to the dashboard for handling
-        dashboard.handlePaste(event)
-        dashboard.openModal()
-    }
+        dashboard.handlePaste(event);
+        dashboard.openModal();
+    };
 }

@@ -1,141 +1,330 @@
 <template>
-    <div class="kiwi-filebuffer-outer-container">
-        <div v-if="!fileList.length">
+    <div class="kiwi-filebuffer-container">
+        <div v-if="!bufferFiles.length" class="kiwi-filebuffer-empty">
             No files have recently been uploaded...
         </div>
-        <div v-else class="kiwi-filebuffer-inner-container">
-            <div v-for="(file, idx) in fileList.slice().reverse()" :key="file.url" class="kiwi-filebuffer-download-container">
-                <a
-                    :href="file.url"
-                    class="kiwi-filebuffer-anchor"
-                    download
-                    title="Download File"
-                    target="_blank"
-                >
-                    <i class="fa fa-download kiwi-filebuffer-downloadicon"/>
-                </a>
-                <div class="kiwi-filebuffer-filetitle" style="font-size: 18px;">
+        <template v-else>
+            <div
+                v-for="upload in bufferFiles"
+                :key="upload.id"
+                class="kiwi-filebuffer-card"
+            >
+                <div class="kiwi-filebuffer-details">
                     <a
-                        :href="file.url"
-                        @click.prevent.stop="loadContent(file.url)"
-                        class="kiwi-filebuffer-anchor"
+                        :href="upload.url"
                         title="Preview File"
+                        class="kiwi-filebuffer-title"
+                        @click.prevent.stop="loadContent(upload.url)"
                     >
-                        {{ file.fileName }}
+                        <span>{{ upload.name }}</span>
+                        <span>{{ upload.ext }}</span>
+                    </a>
+                    <div class="kiwi-filebuffer-info kiwi-filebuffer-time">
+                        {{ upload.expires || upload.time }}
+                    </div>
+                    <div class="kiwi-filebuffer-nicksize">
+                        <span class="kiwi-filebuffer-info kiwi-filebuffer-nick">
+                            {{ upload.nick }}
+                        </span>
+                        <span
+                            v-if="upload.size"
+                            class="kiwi-filebuffer-info kiwi-filebuffer-size"
+                        >
+                            {{ upload.size }}
+                        </span>
+                    </div>
+                </div>
+                <div class="kiwi-filebuffer-download">
+                    <a
+                        :href="upload.url"
+                        title="Download File"
+                        target="_blank"
+                        download
+                    >
+                        <i class="fa fa-download kiwi-filebuffer-icon" />
                     </a>
                 </div>
-                <div class="kiwi-filebuffer-fileinfo"> {{ file.nick }}</div>
-                <div class="kiwi-filebuffer-fileinfo"> {{ file.time }}</div>
-                <div style="clear: both;"></div>
             </div>
-        </div>
+        </template>
     </div>
 </template>
 
 <script>
-
 'kiwi public';
+
+/* global _:true */
+/* global kiwi:true */
+
+import { bytesReadable, durationReadable } from '@/utils/readable';
 
 export default {
     data() {
         return {
             settings: kiwi.state.setting('fileuploader'),
+            messageWatcher: null,
+            bufferFiles: [],
+            updateFilesDebounced: null,
+            urlRegex: null,
+            hasExpires: false,
+            expiresUpdater: 0,
         };
     },
+    computed: {
+        buffer() {
+            return kiwi.state.getActiveBuffer();
+        },
+    },
+    watch: {
+        buffer() {
+            if (this.messageWatcher) {
+                this.messageWatcher();
+                this.messageWatcher = null;
+            }
+            if (this.expiresUpdater) {
+                clearTimeout(this.expiresUpdater);
+                this.expiresUpdater = 0;
+            }
+            this.updateFiles();
+        },
+    },
+    created() {
+        this.updateFilesDebounced = _.debounce(this.updateFiles, 1000);
+
+        let srvUrl = kiwi.state.getSetting('settings.fileuploader.server');
+        if (srvUrl[srvUrl.length - 1] !== '/') {
+            srvUrl += '/';
+        }
+        const srvUrlEscaped = _.escapeRegExp(srvUrl);
+        this.urlRegex = new RegExp(
+            `(?<url>${srvUrlEscaped}(?<id>[a-f0-9]{32})(?:/(?<name>.+?)(?<ext>\\.[^.\\s]+)?)?)(?:[\\s\\]\\)]|$)`,
+        );
+    },
+    beforeDestroy() {
+        if (this.messageWatcher) {
+            this.messageWatcher();
+            this.messageWatcher = null;
+        }
+        if (this.expiresUpdater) {
+            clearTimeout(this.expiresUpdater);
+            this.expiresUpdater = 0;
+        }
+    },
     methods: {
-        getFileName(file) {
-            file = decodeURI(file);
-            let name = file.split('/')[file.split('/').length-1];
-            if (name.length >= 20) {
-                name = name.substring(0, 13) + '...' + name.substring(name.length - 4);
-            }
-            return name;
-        },
-        truncateNick(nick) {
-            if (nick.length >= 13) {
-                nick = nick.substring(0, 11) + "\u2026";
-            }
-            return nick;
-        },
         loadContent(url) {
             kiwi.emit('mediaviewer.show', url);
         },
-        sharedFiles(buffer) {
-            let returnArr = []
-            if(buffer === null) return [];
-            let messages = buffer.getMessages()
-            let tmp = buffer.message_count
-            for(let i = 0; i < messages.length; i++) {
-                let e = messages[i]
-                if (e.message.indexOf(this.settings.server) !== -1) {
-                    let time = new Intl.DateTimeFormat('default', { hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(new Date(e.time))
-                    let url = e.message.substring(e.message.indexOf(this.settings.server)).split(' ')[0].split(')')[0].split('\'')[0]
-                    let link = {
-                        url,
-                        nick: this.truncateNick(e.nick),
-                        fileName: this.getFileName(url),
-                        time
-                    };
-                    returnArr.push(link);
+        updateFiles() {
+            const files = [];
+            const srvUrl = kiwi.state.getSetting(
+                'settings.fileuploader.server',
+            );
+            const messages = this.buffer.getMessages();
+            const existingIds = [];
+            for (let i = 0; i < messages.length; i++) {
+                const msg = messages[i];
+
+                if (msg.message.indexOf(srvUrl) === -1) {
+                    continue;
+                }
+
+                let info = {};
+                if (msg.tags && msg.tags['+kiwiirc.com/fileuploader']) {
+                    try {
+                        info = JSON.parse(
+                            msg.tags['+kiwiirc.com/fileuploader'],
+                        );
+                    } catch {}
+                }
+
+                if (info.expires && info.expires < Date.now() / 1000) {
+                    // upload already expired
+                    continue;
+                }
+
+                const match = this.urlRegex.exec(msg.message);
+                if (!match) {
+                    console.error(
+                        'failed to match fileuploader url',
+                        msg.message,
+                    );
+                    continue;
+                }
+
+                let upload = {
+                    id: match.groups.id,
+                    url: match.groups.url,
+                    name: match.groups.name || '',
+                    ext: match.groups.ext || '',
+                    type: info.type || '',
+                    size: 0,
+                    nick: msg.nick,
+                    time: new Intl.DateTimeFormat('default', {
+                        day: 'numeric',
+                        month: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: 'numeric',
+                        second: 'numeric',
+                    }).format(new Date(msg.time)),
+                    expires: '',
+                    expiresUnix: info.expires || 0,
+                };
+
+                if (info.size) {
+                    upload.size = bytesReadable(info.size);
+                }
+
+                if (upload.expiresUnix) {
+                    this.hasExpires = true;
+                }
+
+                if (!existingIds.includes(upload.id)) {
+                    existingIds.push(upload.id);
+                    files.unshift(upload);
                 }
             }
+            existingIds.length = 0;
 
-            // comment out the following line to include duplicates
-            returnArr = _.uniqBy(returnArr, 'url')
+            if (this.hasExpires) {
+                this.updateExpires(files);
+            }
 
-            kiwi.emit('files.listshared', { fileList: returnArr, buffer })
-            return returnArr
+            if (this.messageWatcher === null) {
+                this.messageWatcher = this.$watch(
+                    'buffer.message_count',
+                    () => {
+                        this.updateFilesDebounced();
+                    },
+                );
+            }
+
+            kiwi.emit('files.listshared', {
+                fileList: files,
+                buffer: this.buffer,
+            });
+
+            this.bufferFiles = files;
+        },
+        updateExpires(_files) {
+            const files = _files || this.bufferFiles;
+            if (this.expiresUpdater) {
+                clearTimeout(this.expiresUpdater);
+                this.expiresUpdater = 0;
+            }
+            for (let i = files.length - 1; i >= 0; i--) {
+                const upload = files[i];
+                if (!upload.expiresUnix) {
+                    continue;
+                }
+                if (upload.expiresUnix < Date.now() / 1000) {
+                    files.splice(i, 1);
+                    continue;
+                }
+                upload.expires = durationReadable(
+                    upload.expiresUnix - Math.floor(Date.now() / 1000),
+                );
+            }
+            this.expiresUpdater = setTimeout(() => this.updateExpires(), 10000);
         },
     },
-    computed: {
-        fileList() {
-            return this.sharedFiles(kiwi.state.getActiveBuffer())
-        }
-    },
-}
+};
 </script>
 
 <style scoped>
-.kiwi-filebuffer-outer-container {
+.kiwi-filebuffer-container {
+    font-family: arial, tahoma;
+    line-height: normal;
     height: 100%;
     width: 100%;
-    margin-top: 5px;
 }
-.kiwi-filebuffer-inner-container {
-    font-family: arial, tahoma;
+
+.kiwi-filebuffer-empty {
+    box-sizing: border-box;
+}
+
+.kiwi-filebuffer-card {
+    display: flex;
     width: 100%;
-}
-.kiwi-filebuffer-download-container {
-    margin: 0 0 5px 0;
-    padding: 10px 10px;
+    padding: 6px;
+    margin-bottom: 0.5em;
+    box-sizing: border-box;
     background: #666;
-    color: #eee;
+    overflow: hidden;
+    white-space: nowrap;
+    color: #fff;
+    line-height: normal;
 }
-.kiwi-filebuffer-downloadicon {
-    float: right;
-    margin-top: 3px;
-    margin-right: 3px;
-    border: 1px solid #fff;
-    border-radius: 50%;
-    padding: 7px;
-    font-size: 16px;
+
+.kiwi-filebuffer-card:last-of-type {
+    margin-bottom: 0;
 }
-.kiwi-filebuffer-filetitle {
+
+.kiwi-filebuffer-details {
+    flex-grow: 1;
+    width: 0;
+}
+
+.kiwi-filebuffer-details span {
+    display: inline-block;
+}
+
+.kiwi-filebuffer-details > * {
+    margin-bottom: 4px;
+}
+
+.kiwi-filebuffer-details > *:last-child {
+    margin-bottom: 0;
+}
+
+.kiwi-filebuffer-details > *:not(:first-child) {
+    font-size: 90%;
+}
+
+.kiwi-filebuffer-title {
+    display: inline-flex;
     font-weight: bold;
-    line-height: normal;
-    margin-bottom: 5px;
-}
-.kiwi-filebuffer-fileinfo {
-    float: left;
-    font-size: 11px;
-    width: 90px;
-    opacity: 0.8;
-    line-height: normal;
-}
-.kiwi-filebuffer-anchor {
-    border: none;
-    color: #eee;
-    cursor: pointer;
     text-decoration: none;
+    max-width: 100%;
+    color: #42b992;
+    cursor: pointer;
+}
+
+.kiwi-filebuffer-title > span:first-child {
+    text-overflow: ellipsis;
+    overflow-x: hidden;
+}
+
+.kiwi-filebuffer-time {
+    text-overflow: ellipsis;
+    overflow-x: hidden;
+}
+
+.kiwi-filebuffer-nicksize {
+    display: flex;
+}
+
+.kiwi-filebuffer-nick {
+    flex-grow: 1;
+    text-overflow: ellipsis;
+    overflow-x: hidden;
+    margin-right: 10px;
+}
+
+.kiwi-filebuffer-download {
+    display: flex;
+    align-items: center;
+    padding-left: 1em;
+    padding-right: 0.2em;
+}
+
+.kiwi-filebuffer-icon {
+    display: flex;
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+    border-radius: 50%;
 }
 </style>

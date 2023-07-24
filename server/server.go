@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -9,6 +8,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/kiwiirc/plugin-fileuploader/config"
 	"github.com/rs/zerolog"
 	globalZerolog "github.com/rs/zerolog/log"
 )
@@ -78,18 +78,18 @@ func (runCtx *RunContext) runLoop() {
 	for {
 		// new server instance
 		serv := UploadServer{}
-		cfg := NewConfig()
+		cfg := config.NewConfig()
 
 		// refresh config
 		md, err := cfg.Load(runCtx.log, runCtx.configPath)
 		if err != nil {
 			runCtx.log.Error().Err(err).Msg("Failed to load config")
-			return
+			os.Exit(1)
 		}
 
 		serv.cfg = *cfg
 
-		multiLogger, err := createMultiLogger(serv.cfg.Loggers)
+		multiLogger, err := config.CreateMultiLogger(serv.cfg.Loggers)
 		if err != nil {
 			runCtx.log.Err(err).Msg("Failed to create MultiLogger")
 		}
@@ -142,8 +142,6 @@ func (runCtx *RunContext) runLoop() {
 			select {
 
 			case err := <-errChan:
-
-				fmt.Printf("errChan: %#v\n", err)
 				// quit if unexpected error occurred
 				if err != http.ErrServerClosed {
 					runCtx.log.Fatal().

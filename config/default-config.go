@@ -1,4 +1,4 @@
-package server
+package config
 
 const defaultConfig = `
 [Server]
@@ -9,7 +9,7 @@ ListenAddress = "127.0.0.1:8088"
 
 # When running as a webircgateway plugin, this path will be relative to the
 # webircgateway domain, e.g. https://ws.irc.example.com/files
-BasePath = "/files"
+BasePath = "/files/"
 # BasePath = "https://example.com/files" # external URL for use behind reverse proxy
 
 # Cross-Origin Resource Sharing (CORS)
@@ -29,6 +29,9 @@ TrustedReverseProxyRanges = [
 	"127.0.0.0/8",
 	"::1/128",
 ]
+
+# Restrict server to users identified by valid JWT Account
+RequireJwtAccount = false
 
 [Storage]
 Path = "./uploads"
@@ -56,14 +59,66 @@ CheckInterval = "5m"
 #
 # When using a webircgateway, the issuer will be the network_common_address of the upstream server
 # if set. Otherwise it will be the hostname used to connect to the network.
+#
+# You can set a fallback issuer as "*" which will be attempted if no other matching hosts exist
+# this can be handy if webircgateway is in gateway mode and providing EXTJWT for unknown networks
 [JwtSecretsByIssuer]
 # "example.com" = "examplesecret"
 # "169.254.0.0" = "anothersecret"
 
+# PreFinishCommands allows system commands to be run based on minetype once the file is fully uploaded
+# but before it is hashed and moved from incomplete so the file can be rejected using RejectOnNoneZeroExit
+# %FILE% will be replace with the full path to the file within [Storage.Path]/incomplete/
+# There can be multiple definitions for [[PreFinishCommands]] and they will be evaluated in order
+# To aid with debugging set RejectOnNoneZeroExit true and loglevel debug
+# "Pattern" can include wildcards * and/or ?
+#
+# The below example uses exiv2 to strip GPSInfo from image files
+# You would need exiv2 installed on the system for it to work
+# [[PreFinishCommands]]
+# Pattern = "image/*"
+# Command = "/usr/bin/exiv2"
+# Args = [
+# 	"-M del Exif.GPSInfo.GPSVersionID",
+# 	"-M del Exif.GPSInfo.GPSLatitudeRef",
+# 	"-M del Exif.GPSInfo.GPSLatitude",
+# 	"-M del Exif.GPSInfo.GPSLongitudeRef",
+# 	"-M del Exif.GPSInfo.GPSLongitude",
+# 	"-M del Exif.GPSInfo.GPSAltitudeRef",
+# 	"-M del Exif.GPSInfo.GPSAltitude",
+# 	"-M del Exif.GPSInfo.GPSTimeStamp",
+# 	"-M del Exif.GPSInfo.GPSSatellites",
+# 	"-M del Exif.GPSInfo.GPSStatus",
+# 	"-M del Exif.GPSInfo.GPSMeasureMode",
+# 	"-M del Exif.GPSInfo.GPSDOP",
+# 	"-M del Exif.GPSInfo.GPSSpeedRef",
+# 	"-M del Exif.GPSInfo.GPSSpeed",
+# 	"-M del Exif.GPSInfo.GPSTrackRef",
+# 	"-M del Exif.GPSInfo.GPSTrack",
+# 	"-M del Exif.GPSInfo.GPSImgDirectionRef",
+# 	"-M del Exif.GPSInfo.GPSImgDirection",
+# 	"-M del Exif.GPSInfo.GPSMapDatum",
+# 	"-M del Exif.GPSInfo.GPSDestLatitudeRef",
+# 	"-M del Exif.GPSInfo.GPSDestLatitude",
+# 	"-M del Exif.GPSInfo.GPSDestLongitudeRef",
+# 	"-M del Exif.GPSInfo.GPSDestLongitude",
+# 	"-M del Exif.GPSInfo.GPSDestBearingRef",
+# 	"-M del Exif.GPSInfo.GPSDestBearing",
+# 	"-M del Exif.GPSInfo.GPSDestDistanceRef",
+# 	"-M del Exif.GPSInfo.GPSDestDistance",
+# 	"-M del Exif.GPSInfo.GPSProcessingMethod",
+# 	"-M del Exif.GPSInfo.GPSAreaInformation",
+# 	"-M del Exif.GPSInfo.GPSDateStamp",
+# 	"-M del Exif.GPSInfo.GPSDifferential",
+# 	"-M del Exif.GPSInfo.GPSHPositioningError",
+# 	"%FILE%"
+# ]
+# RejectOnNoneZeroExit = false
+
 [[Loggers]]
 Level = "info" # debug | info | warn | error | fatal | panic
-Format = "json" # pretty | json
-Output = "stderr:" # stderr: | stdout: | file:/path | udp:ip:port | unix:/path
+Format = "pretty" # pretty | json
+Output = "stderr:" # stderr: | stdout: | file:/path | udp:ip:port | unix:/path | locking-stderr: | locking-stdout:
 
 # [[Loggers]]
 # Level = "debug"

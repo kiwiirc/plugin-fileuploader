@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -11,30 +12,24 @@ import (
 	"path"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	"github.com/kiwiirc/plugin-fileuploader/db"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/kiwiirc/plugin-fileuploader/events"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
-	"github.com/tus/tusd"
-	"github.com/tus/tusd/cmd/tusd/cli/hooks"
+	tusd "github.com/tus/tusd/pkg/handler"
 )
 
-func routePrefixFromBasePath(basePath string) (string, error) {
-	url, err := url.Parse(basePath)
-	if err != nil {
-		return "", err
-	}
-
-	return url.Path, nil
-}
-
-func customizedCors(allowedOrigins []string) gin.HandlerFunc {
+func customizedCors(serv *UploadServer) gin.HandlerFunc {
 	// convert slice values to keys of map for "contains" test
-	originSet := make(map[string]struct{}, len(allowedOrigins))
+	originSet := make(map[string]struct{}, len(serv.cfg.Server.CorsOrigins))
+	allowAll := false
 	exists := struct{}{}
-	for _, origin := range allowedOrigins {
+	for _, origin := range serv.cfg.Server.CorsOrigins {
+		if origin == "*" {
+			allowAll = true
+			continue
+		}
 		originSet[origin] = exists
 	}
 
@@ -42,16 +37,70 @@ func customizedCors(allowedOrigins []string) gin.HandlerFunc {
 		origin := c.Request.Header.Get("Origin")
 		respHeader := c.Writer.Header()
 
-		// only allow the origin if it's in the list from the config, * is not supported!
-		if _, ok := originSet[origin]; ok {
+		// only allow the origin if it's in the list from the config
+		if allowAll && origin != "" {
+			respHeader.Set("Access-Control-Allow-Origin", origin)
+		} else if _, ok := originSet[origin]; ok {
 			respHeader.Set("Access-Control-Allow-Origin", origin)
 		} else {
 			respHeader.Del("Access-Control-Allow-Origin")
+			if c.Request.Method != "HEAD" && c.Request.Method != "GET" {
+				// Don't log unknown cors origin for HEAD or GET requests
+				serv.log.Warn().Str("origin", origin).Msg("Unknown cors origin")
+			}
 		}
 
 		// lets the user-agent know the response can vary depending on the origin of the request.
-		// ensures correct behavior of browser cache.
+		// ensures correct behaviour of browser cache.
 		respHeader.Add("Vary", "Origin")
+	}
+}
+
+func (serv *UploadServer) fileuploaderMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method != "POST" && c.Request.Method != "DELETE" {
+			// Metadata is only required for POST and DELETE requests
+			return
+		}
+
+		metadata := tusd.ParseMetadataHeader(c.Request.Header.Get("Upload-Metadata"))
+
+		// ensure the user does not try to provide their own RemoteIP
+		delete(metadata, "RemoteIP")
+
+		// determine the originating IP
+		remoteIP, err := serv.getDirectOrForwardedRemoteIP(c.Request)
+		if err != nil {
+			if addrErr, ok := err.(*net.AddrError); ok {
+				c.AbortWithError(http.StatusInternalServerError, addrErr).SetType(gin.ErrorTypePrivate)
+			} else {
+				c.AbortWithError(http.StatusNotAcceptable, err)
+			}
+			return
+		}
+
+		// add RemoteIP to metadata
+		metadata["RemoteIP"] = remoteIP
+
+		err = serv.processJwt(metadata)
+		if err != nil {
+			// Jwt failures are none fatal, but will result in the uploaded being treated as anonymous
+			// Stick a warning in the log to help with debugging
+			serv.log.Warn().
+				Err(err).
+				Str("extjwt", metadata["extjwt"]).
+				Msg("Failed to process EXTJWT")
+			err = nil
+		}
+
+		// extjwt is no longer needed, remove so it does not get stored with the file info
+		delete(metadata, "extjwt")
+
+		// Update metadata with any changes that have been made
+		c.Request.Header.Set("Upload-Metadata", tusd.SerializeMetadataHeader(metadata))
+
+		// store metadata in gin context so it does not need to be parsed again
+		c.Set("metadata", metadata)
 	}
 }
 
@@ -89,126 +138,86 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	// attach logger
 	go logging.TusdLogger(serv.log, serv.tusEventBroadcaster)
 
-	// attach uploader IP recorder
-	go serv.ipRecorder(serv.tusEventBroadcaster)
-
 	noopHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-
-	// For unknown reasons, this middleware must be mounted on the top level router.
-	// When attached to the RouterGroup, it does not get called for some requests.
 	tusdMiddleware := gin.WrapH(handler.Middleware(noopHandler))
-	r.Use(tusdMiddleware)
-	r.Use(customizedCors(serv.cfg.Server.CorsOrigins))
 
 	rg := r.Group(routePrefix)
+	rg.Use(tusdMiddleware)
+	rg.Use(customizedCors(serv))
+	rg.Use(serv.fileuploaderMiddleware())
 	rg.POST("", serv.postFile(handler))
-	rg.HEAD(":id", gin.WrapF(handler.HeadFile))
-	rg.PATCH(":id", gin.WrapF(handler.PatchFile))
+
+	// Register a dummy handler for OPTIONS, without this the middleware's would not be called
+	rg.OPTIONS("*any", gin.WrapH(noopHandler))
+
+	headFile := gin.WrapF(handler.HeadFile)
+	rg.HEAD(":id", headFile)
+	rg.HEAD(":id/:filename", rewritePath(headFile, routePrefix))
+
+	getFile := gin.WrapF(handler.GetFile)
+	rg.GET(":id", getFile)
+	rg.GET(":id/:filename", rewritePath(getFile, routePrefix))
+
+	patchFile := gin.WrapF(handler.PatchFile)
+	rg.PATCH(":id", patchFile)
+	rg.PATCH(":id/:filename", rewritePath(patchFile, routePrefix))
 
 	// Only attach the DELETE handler if the Terminate() method is provided
 	if config.StoreComposer.UsesTerminater {
-		rg.DELETE(":id", gin.WrapF(handler.DelFile))
-	}
-
-	// GET handler requires the GetReader() method
-	if config.StoreComposer.UsesGetReader {
-		getFile := gin.WrapF(handler.GetFile)
-		rg.GET(":id", getFile)
-		rg.GET(":id/:filename", func(c *gin.Context) {
-			// rewrite request path to ":id" route pattern
-			c.Request.URL.Path = path.Join(routePrefix, url.PathEscape(c.Param("id")))
-
-			// call the normal handler
-			getFile(c)
-		})
+		delFile := serv.delFile(handler)
+		rg.DELETE(":id", delFile)
+		rg.DELETE(":id/:filename", rewritePath(delFile, routePrefix))
 	}
 
 	return nil
 }
 
-func isFatalJwtError(err error) (fatal bool) {
-	fatal = true
-
-	// jwt.ValidationError<UnknownIssuerError> => non-fatal
-	if jwtValidationErr, ok := err.(*jwt.ValidationError); ok {
-		if _, ok := jwtValidationErr.Inner.(*UnknownIssuerError); ok {
-			fatal = false
-			return
-		}
-	}
-
-	return
-}
-
 func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		err := serv.addRemoteIPToMetadata(c.Request)
-		if err != nil {
-			if addrErr, ok := err.(*net.AddrError); ok {
-				c.AbortWithError(http.StatusInternalServerError, addrErr).SetType(gin.ErrorTypePrivate)
-			} else {
-				c.AbortWithError(http.StatusNotAcceptable, err)
-			}
-			return
-		}
+		metadata := c.MustGet("metadata").(map[string]string)
 
-		err = serv.processJwt(c.Request)
-
-		if err != nil {
-			if isFatalJwtError(err) {
-				if jwtValidationErr, ok := err.(*jwt.ValidationError); ok && jwtValidationErr.Inner == jwt.ErrSignatureInvalid {
-					c.Error(jwtValidationErr).SetType(gin.ErrorTypePublic)
-					c.AbortWithStatusJSON(http.StatusUnauthorized, fmt.Sprintf("Failed to process EXTJWT: %s. Configured secret may be incorrect.", jwtValidationErr))
-					return
-				}
-				c.AbortWithError(http.StatusBadRequest, err).SetType(gin.ErrorTypePublic)
+		if serv.cfg.Server.RequireJwtAccount {
+			if metadata["account"] == "" {
+				c.Error(errors.New("Missing JWT account")).SetType(gin.ErrorTypePublic)
+				c.AbortWithStatusJSON(http.StatusUnauthorized, "Account required")
 				return
 			}
-			serv.log.Warn().
-				Err(err).
-				Msg("Failed to process EXTJWT")
 		}
 
 		handler.PostFile(c.Writer, c.Request)
 	}
 }
 
-func (serv *UploadServer) addRemoteIPToMetadata(req *http.Request) (err error) {
-	const uploadMetadataHeader = "Upload-Metadata"
-	const remoteIPKey = "RemoteIP"
+func (serv *UploadServer) delFile(handler *tusd.UnroutedHandler) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		metadata := c.MustGet("metadata").(map[string]string)
 
-	metadata := parseMeta(req.Header.Get(uploadMetadataHeader))
+		var uploaderIP, jwtAccount, jwtIssuer string
+		row := serv.DBConn.DB.QueryRow(`SELECT uploader_ip, jwt_account, jwt_issuer FROM uploads WHERE id = ?`, id)
+		err := row.Scan(&uploaderIP, &jwtAccount, &jwtIssuer)
 
-	// ensure the client doesn't attempt to specify their own RemoteIP
-	for k := range metadata {
-		if k == remoteIPKey {
-			return fmt.Errorf("Metadata field " + remoteIPKey + " cannot be set by client")
+		// no finalized upload exists
+		if err == sql.ErrNoRows {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		} else if err != nil {
+			c.AbortWithError(http.StatusInternalServerError, err).SetType(gin.ErrorTypePrivate)
+			return
 		}
+
+		if jwtAccount != "" && (jwtAccount != metadata["account"] || jwtIssuer != metadata["issuer"]) {
+			// The upload was created by an identified account that does not match this requests account
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		} else if uploaderIP == "" || uploaderIP != metadata["RemoteIP"] {
+			// The upload was created by an anonymous user that does not match this requests ip address
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		handler.DelFile(c.Writer, c.Request)
 	}
-
-	// determine the originating IP
-	remoteIP, err := serv.getDirectOrForwardedRemoteIP(req)
-	if err != nil {
-		return err
-	}
-
-	// add RemoteIP to metadata
-	metadata[remoteIPKey] = remoteIP
-
-	// override original header
-	req.Header.Set(uploadMetadataHeader, serializeMeta(metadata))
-
-	return
-}
-
-// UnknownIssuerError occurs when a file creation request includes an EXTJWT
-// with an issuer that is not present in the config
-type UnknownIssuerError struct {
-	Issuer string
-}
-
-func (e UnknownIssuerError) Error() string {
-	return fmt.Sprintf("Issuer %#v not configured", e.Issuer)
 }
 
 func (serv *UploadServer) getSecretForToken(token *jwt.Token) (interface{}, error) {
@@ -219,38 +228,39 @@ func (serv *UploadServer) getSecretForToken(token *jwt.Token) (interface{}, erro
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return nil, fmt.Errorf("Failed to get claims")
+		return nil, errors.New("Failed to get claims")
 	}
 
 	issuer, ok := claims["iss"]
 	if !ok {
-		return nil, fmt.Errorf("Issuer field 'iss' missing from JWT")
+		return nil, errors.New("Issuer field 'iss' missing from JWT")
 	}
 
 	issuerStr, ok := issuer.(string)
 	if !ok {
-		return nil, fmt.Errorf("Failed to coerce issuer to string")
+		return nil, errors.New("Failed to coerce issuer to string")
 	}
 
 	secret, ok := serv.cfg.JwtSecretsByIssuer[issuerStr]
 	if !ok {
-		return nil, &UnknownIssuerError{Issuer: issuerStr}
+		// Attempt to get fallback issuer
+		secret, ok = serv.cfg.JwtSecretsByIssuer["*"]
+
+		if !ok {
+			return nil, fmt.Errorf("Issuer %#v not configured", issuerStr)
+		} else {
+			serv.log.Warn().
+				Msg(fmt.Sprintf("Issuer %#v not configured, used fallback", issuerStr))
+		}
 	}
 
 	return []byte(secret), nil
 }
 
-func (serv *UploadServer) processJwt(req *http.Request) (err error) {
-	metadata := parseMeta(req.Header.Get("Upload-Metadata"))
-
+func (serv *UploadServer) processJwt(metadata map[string]string) (err error) {
 	// ensure the client doesn't attempt to specify their own account/issuer fields
-	for k := range metadata {
-		switch k {
-		case "account":
-		case "issuer":
-			return fmt.Errorf("Metadata field %#v cannot be set by client", k)
-		}
-	}
+	delete(metadata, "issuer")
+	delete(metadata, "account")
 
 	tokenString := metadata["extjwt"]
 	if tokenString == "" {
@@ -262,25 +272,23 @@ func (serv *UploadServer) processJwt(req *http.Request) (err error) {
 		return err
 	}
 
+	if !token.Valid {
+		return errors.New("invalid jwt")
+	}
+
 	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		return
-	}
-
-	issuer := claims["iss"].(string)
-	account, ok := claims["account"].(string)
 	if !ok {
-		return nil
+		return fmt.Errorf("no jwt claims")
 	}
 
-	metadata["issuer"] = issuer
-	metadata["account"] = account
+	if issuer, ok := claims["iss"].(string); ok {
+		metadata["issuer"] = issuer
+	}
+	if account, ok := claims["account"].(string); ok {
+		metadata["account"] = account
+	}
 
-	// override original header
-	req.Header.Set("Upload-Metadata", serializeMeta(metadata))
-
-	fmt.Printf("metadata updated: account=%v issuer=%v\n", account, issuer)
-	return
+	return nil
 }
 
 // ErrInvalidXForwardedFor occurs if the X-Forwarded-For header is trusted but invalid
@@ -340,34 +348,21 @@ func (serv *UploadServer) remoteIPisTrusted(remoteIP net.IP) bool {
 	return false
 }
 
-func (serv *UploadServer) ipRecorder(broadcaster *events.TusEventBroadcaster) {
-	channel := broadcaster.Listen()
-	for {
-		event, ok := <-channel
-		if !ok {
-			return // channel closed
-		}
-		if event.Type == hooks.HookPostCreate {
-			go func() {
-				ip := event.Info.MetaData["RemoteIP"]
+func routePrefixFromBasePath(basePath string) (string, error) {
+	url, err := url.Parse(basePath)
+	if err != nil {
+		return "", err
+	}
 
-				serv.log.Debug().
-					Str("id", event.Info.ID).
-					Str("ip", ip).
-					Msg("Recording uploader IP")
+	return url.Path, nil
+}
 
-				err := db.UpdateRow(serv.DBConn.DB, `
-					UPDATE uploads
-					SET uploader_ip = ?
-					WHERE id = ?
-				`, ip, event.Info.ID)
+func rewritePath(handler gin.HandlerFunc, routePrefix string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// rewrite request path to ":id" route pattern
+		c.Request.URL.Path = path.Join(routePrefix, url.PathEscape(c.Param("id")))
 
-				if err != nil {
-					serv.log.Error().
-						Err(err).
-						Msg("Failed to record uploader IP")
-				}
-			}()
-		}
+		// call the normal handler
+		handler(c)
 	}
 }

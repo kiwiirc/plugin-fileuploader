@@ -1,14 +1,14 @@
-import { getValidUploadTarget } from '../utils/get-valid-upload-target'
+import { getValidUploadTarget } from '../utils/get-valid-upload-target';
 
 export function showDashboardOnDragEnter(kiwiApi, dashboard) {
     return function handleDragEnter(/* event */) {
         // swallow error and ignore drag if no valid buffer to share to
         try {
-            getValidUploadTarget(kiwiApi)
+            getValidUploadTarget(kiwiApi);
         } catch (err) {
-            return
+            return;
         }
 
-        dashboard.openModal()
-    }
+        dashboard.openModal();
+    };
 }
