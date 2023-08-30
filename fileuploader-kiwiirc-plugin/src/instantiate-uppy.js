@@ -4,9 +4,14 @@ import Tus from '@uppy/tus';
 import Webcam from '@uppy/webcam';
 import Audio from '@uppy/audio';
 import ImageEditor from '@uppy/image-editor';
+import prettierBytes from '@transloadit/prettier-bytes';
 
-import { KiB } from './constants/data-size';
+import Bytes from 'bytes';
+import Wildcard from 'wildcard';
+
 import acquireExtjwtBeforeUpload from './handlers/uppy/acquire-extjwt-before-upload';
+
+import * as config from '@/config.js';
 
 export default function instantiateUppy({
     kiwiApi,
@@ -20,15 +25,22 @@ export default function instantiateUppy({
         trigger: uploadFileButton,
         proudlyDisplayPoweredByUppy: false,
         closeModalOnClickOutside: true,
-        note: kiwiApi.state.setting('fileuploader.note'),
+        note: config.getSetting('note'),
         ...dashboardOptions,
     };
 
     const effectiveTusOpts = {
-        endpoint: kiwiApi.state.setting('fileuploader.server'),
-        chunkSize: 512 * KiB,
+        endpoint: config.getSetting('server'),
+        chunkSize: Bytes.parse('512KB'),
         ...tusOptions,
     };
+
+    const maxSizeTypesConfig = config.getSetting('maxFileSizeTypes');
+    const maxSizeTypes = Object.create(null);
+
+    if (maxSizeTypesConfig) {
+        Object.entries(maxSizeTypesConfig).forEach(([key, val]) => (maxSizeTypes[key] = Bytes.parse(val)));
+    }
 
     const effectiveUppyOpts = {
         autoProceed: false,
@@ -37,15 +49,36 @@ export default function instantiateUppy({
             const isValidTarget = buffer && (buffer.isChannel() || buffer.isQuery());
             if (!isValidTarget) {
                 // TODO add translation
-                uppy.info('Files can only be shared in channels or queries.', 'error', 5000);
+                uppy.info('Files can only be shared in channels or queries.', 'error', uppy.opts.infoTimeout);
                 return false;
             }
             file.kiwiFileUploaderTargetBuffer = buffer;
+
+            if (!file.type) {
+                return true;
+            }
+
+            const matched = Object.entries(maxSizeTypes).find(([key]) => Wildcard(key, file.type));
+            if (!matched) {
+                return true;
+            }
+
+            if (file.size && file.size > matched[1]) {
+                uppy.info(
+                    uppy.i18n('exceedsSize', {
+                        size: prettierBytes(matched[1]),
+                        file: file.name,
+                    }),
+                    'error',
+                    uppy.opts.infoTimeout
+                );
+                return false;
+            }
             return true;
         },
         restrictions: {
-            maxFileSize: kiwiApi.state.setting('fileuploader.maxFileSize'),
-            allowedFileTypes: kiwiApi.state.setting('fileuploader.allowedFileTypes'),
+            maxFileSize: Bytes.parse(config.getSetting('maxFileSize')),
+            allowedFileTypes: config.getSetting('allowedFileTypes'),
         },
         ...uppyOptions,
     };

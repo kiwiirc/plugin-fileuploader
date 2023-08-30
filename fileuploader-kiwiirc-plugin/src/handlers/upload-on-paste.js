@@ -1,6 +1,8 @@
 import { getValidUploadTarget } from '../utils/get-valid-upload-target';
 import { numLines } from '../utils/num-lines';
 
+import * as config from '@/config.js';
+
 export function uploadOnPaste(kiwiApi, uppy, dashboard) {
     return function handleBufferPaste(event) {
         // swallow error and ignore paste if no valid buffer to share to
@@ -20,11 +22,11 @@ export function uploadOnPaste(kiwiApi, uppy, dashboard) {
         // detect large text pastes, offer to create a file upload instead
         const text = cbData.getData('text');
         if (text) {
-            const promptDisabled = kiwiApi.state.setting('fileuploader.textPasteNeverPrompt');
+            const promptDisabled = config.getSetting('textPasteNeverPrompt');
             if (promptDisabled) {
                 return;
             }
-            const minLines = kiwiApi.state.setting('fileuploader.textPastePromptMinimumLines');
+            const minLines = config.getSetting('textPastePromptMinimumLines');
             const network = kiwiApi.state.getActiveNetwork();
             const networkMaxLineLen =
                 network.ircClient.options.message_max_length;

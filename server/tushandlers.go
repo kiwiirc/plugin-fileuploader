@@ -105,15 +105,12 @@ func (serv *UploadServer) fileuploaderMiddleware() gin.HandlerFunc {
 }
 
 func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfilestore.ShardedFileStore) error {
-	composer := tusd.NewStoreComposer()
-	store.UseIn(composer)
-
 	maximumUploadSize := serv.cfg.Storage.MaximumUploadSize
 	serv.log.Debug().Str("size", maximumUploadSize.String()).Msg("Using upload limit")
 
 	config := tusd.Config{
 		BasePath:                serv.cfg.Server.BasePath,
-		StoreComposer:           composer,
+		StoreComposer:           serv.composer,
 		MaxSize:                 int64(maximumUploadSize.Bytes()),
 		Logger:                  goLog.New(ioutil.Discard, "", 0),
 		NotifyCompleteUploads:   true,
@@ -154,7 +151,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	rg.HEAD(":id", headFile)
 	rg.HEAD(":id/:filename", rewritePath(headFile, routePrefix))
 
-	getFile := gin.WrapF(handler.GetFile)
+	getFile := serv.getFile(handler, store)
 	rg.GET(":id", getFile)
 	rg.GET(":id/:filename", rewritePath(getFile, routePrefix))
 
@@ -163,7 +160,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	rg.PATCH(":id/:filename", rewritePath(patchFile, routePrefix))
 
 	// Only attach the DELETE handler if the Terminate() method is provided
-	if config.StoreComposer.UsesTerminater {
+	if serv.composer.UsesTerminater {
 		delFile := serv.delFile(handler)
 		rg.DELETE(":id", delFile)
 		rg.DELETE(":id/:filename", rewritePath(delFile, routePrefix))

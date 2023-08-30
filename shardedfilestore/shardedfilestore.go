@@ -121,7 +121,7 @@ func (store ShardedFileStore) NewUpload(ctx context.Context, info handler.FileIn
 		return nil, err
 	}
 
-	upload := &fileUpload{
+	upload := &FileUpload{
 		info:     info,
 		store:    store,
 		infoPath: store.infoPath(info.ID),
@@ -137,7 +137,7 @@ func (store ShardedFileStore) NewUpload(ctx context.Context, info handler.FileIn
 	return upload, nil
 }
 
-func (store ShardedFileStore) GetUpload(ctx context.Context, id string) (handler.Upload, error) {
+func (store ShardedFileStore) GetFileUpload(ctx context.Context, id string) (*FileUpload, error) {
 	info := handler.FileInfo{}
 	data, err := ioutil.ReadFile(store.infoPath(id))
 	if err != nil {
@@ -164,7 +164,7 @@ func (store ShardedFileStore) GetUpload(ctx context.Context, id string) (handler
 
 	info.Offset = stat.Size()
 
-	return &fileUpload{
+	return &FileUpload{
 		info:     info,
 		binPath:  binPath,
 		store:    store,
@@ -172,16 +172,20 @@ func (store ShardedFileStore) GetUpload(ctx context.Context, id string) (handler
 	}, nil
 }
 
+func (store ShardedFileStore) GetUpload(ctx context.Context, id string) (handler.Upload, error) {
+	return store.GetFileUpload(ctx, id)
+}
+
 func (store ShardedFileStore) AsTerminatableUpload(upload handler.Upload) handler.TerminatableUpload {
-	return upload.(*fileUpload)
+	return upload.(*FileUpload)
 }
 
 func (store ShardedFileStore) AsLengthDeclarableUpload(upload handler.Upload) handler.LengthDeclarableUpload {
-	return upload.(*fileUpload)
+	return upload.(*FileUpload)
 }
 
 func (store ShardedFileStore) AsConcatableUpload(upload handler.Upload) handler.ConcatableUpload {
-	return upload.(*fileUpload)
+	return upload.(*FileUpload)
 }
 
 // binPath returns the path to the file storing the binary data.
@@ -204,7 +208,7 @@ func (store *ShardedFileStore) infoPath(id string) string {
 	return filepath.Join(store.metaDir(id), id+".info")
 }
 
-type fileUpload struct {
+type FileUpload struct {
 	// info stores the current information about the upload
 	info handler.FileInfo
 	// store the fileupload's store
@@ -215,11 +219,11 @@ type fileUpload struct {
 	binPath string
 }
 
-func (upload *fileUpload) GetInfo(ctx context.Context) (handler.FileInfo, error) {
+func (upload *FileUpload) GetInfo(ctx context.Context) (handler.FileInfo, error) {
 	return upload.info, nil
 }
 
-func (upload *fileUpload) WriteChunk(ctx context.Context, offset int64, src io.Reader) (int64, error) {
+func (upload *FileUpload) WriteChunk(ctx context.Context, offset int64, src io.Reader) (int64, error) {
 	file, err := os.OpenFile(upload.binPath, os.O_WRONLY|os.O_APPEND, defaultFilePerm)
 	if err != nil {
 		return 0, err
@@ -232,15 +236,19 @@ func (upload *fileUpload) WriteChunk(ctx context.Context, offset int64, src io.R
 	return n, err
 }
 
-func (upload *fileUpload) GetReader(ctx context.Context) (io.Reader, error) {
+func (upload *FileUpload) GetReader(ctx context.Context) (io.Reader, error) {
 	return os.Open(upload.binPath)
 }
 
-func (upload *fileUpload) Terminate(ctx context.Context) error {
+func (upload *FileUpload) GetFile(ctx context.Context) (*os.File, error) {
+	return os.Open(upload.binPath)
+}
+
+func (upload *FileUpload) Terminate(ctx context.Context) error {
 	return upload.store.Terminate(upload.info.ID)
 }
 
-func (upload *fileUpload) ConcatUploads(ctx context.Context, uploads []handler.Upload) (err error) {
+func (upload *FileUpload) ConcatUploads(ctx context.Context, uploads []handler.Upload) (err error) {
 	file, err := os.OpenFile(upload.binPath, os.O_WRONLY|os.O_APPEND, defaultFilePerm)
 	if err != nil {
 		return err
@@ -248,7 +256,7 @@ func (upload *fileUpload) ConcatUploads(ctx context.Context, uploads []handler.U
 	defer file.Close()
 
 	for _, partialUpload := range uploads {
-		fileUpload := partialUpload.(*fileUpload)
+		fileUpload := partialUpload.(*FileUpload)
 
 		src, err := os.Open(fileUpload.binPath)
 		if err != nil {
@@ -263,14 +271,14 @@ func (upload *fileUpload) ConcatUploads(ctx context.Context, uploads []handler.U
 	return
 }
 
-func (upload *fileUpload) DeclareLength(ctx context.Context, length int64) error {
+func (upload *FileUpload) DeclareLength(ctx context.Context, length int64) error {
 	upload.info.Size = length
 	upload.info.SizeIsDeferred = false
 	return upload.writeInfo()
 }
 
 // writeInfo updates the entire information. Everything will be overwritten.
-func (upload *fileUpload) writeInfo() error {
+func (upload *FileUpload) writeInfo() error {
 	data, err := json.Marshal(upload.info)
 	if err != nil {
 		return err
@@ -278,7 +286,7 @@ func (upload *fileUpload) writeInfo() error {
 	return ioutil.WriteFile(upload.infoPath, data, defaultFilePerm)
 }
 
-func (upload *fileUpload) FinishUpload(ctx context.Context) error {
+func (upload *FileUpload) FinishUpload(ctx context.Context) error {
 	upload.store.log.Debug().
 		Str("event", "upload_finished").
 		Str("id", upload.info.ID).Msg("Finishing upload")

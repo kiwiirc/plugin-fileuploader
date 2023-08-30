@@ -56,15 +56,18 @@
 /* global kiwi:true */
 
 import { bytesReadable, durationReadable } from '@/utils/readable';
+import * as config from '@/config.js';
+
+const urlRegex = new RegExp(
+    '/(?<id>[a-f0-9]{32})(?:/(?<name>.+?)(?<ext>\\.[^.\\s]+)?)?$',
+);
 
 export default {
     data() {
         return {
-            settings: kiwi.state.setting('fileuploader'),
             messageWatcher: null,
             bufferFiles: [],
             updateFilesDebounced: null,
-            urlRegex: null,
             hasExpires: false,
             expiresUpdater: 0,
         };
@@ -89,15 +92,9 @@ export default {
     },
     created() {
         this.updateFilesDebounced = _.debounce(this.updateFiles, 1000);
-
-        let srvUrl = kiwi.state.getSetting('settings.fileuploader.server');
-        if (srvUrl[srvUrl.length - 1] !== '/') {
-            srvUrl += '/';
-        }
-        const srvUrlEscaped = _.escapeRegExp(srvUrl);
-        this.urlRegex = new RegExp(
-            `(?<url>${srvUrlEscaped}(?<id>[a-f0-9]{32})(?:/(?<name>.+?)(?<ext>\\.[^.\\s]+)?)?)(?:[\\s\\]\\)]|$)`,
-        );
+    },
+    mounted() {
+        this.updateFiles();
     },
     beforeDestroy() {
         if (this.messageWatcher) {
@@ -115,33 +112,31 @@ export default {
         },
         updateFiles() {
             const files = [];
-            const srvUrl = kiwi.state.getSetting(
-                'settings.fileuploader.server',
-            );
+            const srvUrl = config.getSetting('server');
             const messages = this.buffer.getMessages();
             const existingIds = [];
+
             for (let i = 0; i < messages.length; i++) {
                 const msg = messages[i];
 
-                if (msg.message.indexOf(srvUrl) === -1) {
+                const upload = msg.fileuploader;
+                const info = upload?.fileInfo;
+
+                if (upload?.hasError) {
                     continue;
                 }
 
-                let info = {};
-                if (msg.tags && msg.tags['+kiwiirc.com/fileuploader']) {
-                    try {
-                        info = JSON.parse(
-                            msg.tags['+kiwiirc.com/fileuploader'],
-                        );
-                    } catch {}
+                const url = msg.mentioned_urls[0];
+                if (!url || (!upload && url.indexOf(srvUrl) !== 0)) {
+                    continue;
                 }
 
-                if (info.expires && info.expires < Date.now() / 1000) {
+                if (info?.expires && info.expires < Date.now() / 1000) {
                     // upload already expired
                     continue;
                 }
 
-                const match = this.urlRegex.exec(msg.message);
+                const match = urlRegex.exec(url);
                 if (!match) {
                     console.error(
                         'failed to match fileuploader url',
@@ -150,13 +145,13 @@ export default {
                     continue;
                 }
 
-                let upload = {
+                const details = {
                     id: match.groups.id,
-                    url: match.groups.url,
+                    url: url,
                     name: match.groups.name || '',
                     ext: match.groups.ext || '',
-                    type: info.type || '',
-                    size: 0,
+                    type: info?.type || '',
+                    size: info?.size ? bytesReadable(info.size) : 0,
                     nick: msg.nick,
                     time: new Intl.DateTimeFormat('default', {
                         day: 'numeric',
@@ -167,20 +162,16 @@ export default {
                         second: 'numeric',
                     }).format(new Date(msg.time)),
                     expires: '',
-                    expiresUnix: info.expires || 0,
+                    expiresUnix: info?.expires || 0,
                 };
 
-                if (info.size) {
-                    upload.size = bytesReadable(info.size);
-                }
-
-                if (upload.expiresUnix) {
+                if (details.expiresUnix) {
                     this.hasExpires = true;
                 }
 
-                if (!existingIds.includes(upload.id)) {
-                    existingIds.push(upload.id);
-                    files.unshift(upload);
+                if (!existingIds.includes(details.id)) {
+                    existingIds.push(details.id);
+                    files.unshift(details);
                 }
             }
             existingIds.length = 0;
@@ -236,6 +227,7 @@ export default {
     line-height: normal;
     height: 100%;
     width: 100%;
+    box-sizing: border-box;
 }
 
 .kiwi-filebuffer-empty {

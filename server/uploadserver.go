@@ -13,6 +13,7 @@ import (
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 	"github.com/rs/zerolog"
+	tusd "github.com/tus/tusd/pkg/handler"
 )
 
 // UploadServer is a simple configurable service for file sharing.
@@ -23,6 +24,7 @@ type UploadServer struct {
 
 	cfg                 config.Config
 	log                 *zerolog.Logger
+	composer            *tusd.StoreComposer
 	store               *shardedfilestore.ShardedFileStore
 	expirer             *expirer.Expirer
 	httpServer          *http.Server
@@ -66,6 +68,9 @@ func (serv *UploadServer) Run(replaceableHandler *ReplaceableHandler) error {
 		serv.DBConn,
 		serv.log,
 	)
+
+	serv.composer = tusd.NewStoreComposer()
+	serv.store.UseIn(serv.composer)
 
 	serv.expirer = expirer.New(
 		serv.store,
