@@ -14,10 +14,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/kiwiirc/plugin-fileuploader/db"
 	"github.com/kiwiirc/plugin-fileuploader/events"
 	"github.com/kiwiirc/plugin-fileuploader/logging"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
-	tusd "github.com/tus/tusd/pkg/handler"
+	"github.com/tus/tusd/pkg/handler"
 )
 
 func customizedCors(serv *UploadServer) gin.HandlerFunc {
@@ -63,7 +64,7 @@ func (serv *UploadServer) fileuploaderMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		metadata := tusd.ParseMetadataHeader(c.Request.Header.Get("Upload-Metadata"))
+		metadata := handler.ParseMetadataHeader(c.Request.Header.Get("Upload-Metadata"))
 
 		// ensure the user does not try to provide their own RemoteIP
 		delete(metadata, "RemoteIP")
@@ -97,7 +98,7 @@ func (serv *UploadServer) fileuploaderMiddleware() gin.HandlerFunc {
 		delete(metadata, "extjwt")
 
 		// Update metadata with any changes that have been made
-		c.Request.Header.Set("Upload-Metadata", tusd.SerializeMetadataHeader(metadata))
+		c.Request.Header.Set("Upload-Metadata", handler.SerializeMetadataHeader(metadata))
 
 		// store metadata in gin context so it does not need to be parsed again
 		c.Set("metadata", metadata)
@@ -105,15 +106,12 @@ func (serv *UploadServer) fileuploaderMiddleware() gin.HandlerFunc {
 }
 
 func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfilestore.ShardedFileStore) error {
-	composer := tusd.NewStoreComposer()
-	store.UseIn(composer)
-
 	maximumUploadSize := serv.cfg.Storage.MaximumUploadSize
 	serv.log.Debug().Str("size", maximumUploadSize.String()).Msg("Using upload limit")
 
-	config := tusd.Config{
+	config := handler.Config{
 		BasePath:                serv.cfg.Server.BasePath,
-		StoreComposer:           composer,
+		StoreComposer:           serv.composer,
 		MaxSize:                 int64(maximumUploadSize.Bytes()),
 		Logger:                  goLog.New(ioutil.Discard, "", 0),
 		NotifyCompleteUploads:   true,
@@ -127,7 +125,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 		return err
 	}
 
-	handler, err := tusd.NewUnroutedHandler(config)
+	handler, err := handler.NewUnroutedHandler(config)
 	if err != nil {
 		return err
 	}
@@ -154,7 +152,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	rg.HEAD(":id", headFile)
 	rg.HEAD(":id/:filename", rewritePath(headFile, routePrefix))
 
-	getFile := gin.WrapF(handler.GetFile)
+	getFile := serv.getFile(handler, store)
 	rg.GET(":id", getFile)
 	rg.GET(":id/:filename", rewritePath(getFile, routePrefix))
 
@@ -163,7 +161,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	rg.PATCH(":id/:filename", rewritePath(patchFile, routePrefix))
 
 	// Only attach the DELETE handler if the Terminate() method is provided
-	if config.StoreComposer.UsesTerminater {
+	if serv.composer.UsesTerminater {
 		delFile := serv.delFile(handler)
 		rg.DELETE(":id", delFile)
 		rg.DELETE(":id/:filename", rewritePath(delFile, routePrefix))
@@ -172,7 +170,7 @@ func (serv *UploadServer) registerTusHandlers(r *gin.Engine, store *shardedfiles
 	return nil
 }
 
-func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFunc {
+func (serv *UploadServer) postFile(handler *handler.UnroutedHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		metadata := c.MustGet("metadata").(map[string]string)
 
@@ -188,14 +186,13 @@ func (serv *UploadServer) postFile(handler *tusd.UnroutedHandler) gin.HandlerFun
 	}
 }
 
-func (serv *UploadServer) delFile(handler *tusd.UnroutedHandler) gin.HandlerFunc {
+func (serv *UploadServer) delFile(handler *handler.UnroutedHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		metadata := c.MustGet("metadata").(map[string]string)
 
 		var uploaderIP, jwtAccount, jwtIssuer string
-		row := serv.DBConn.DB.QueryRow(`SELECT uploader_ip, jwt_account, jwt_issuer FROM uploads WHERE id = ?`, id)
-		err := row.Scan(&uploaderIP, &jwtAccount, &jwtIssuer)
+		err := db.QueryRow(serv.DBConn, `SELECT uploader_ip, jwt_account, jwt_issuer FROM uploads WHERE id = ?`, id).Scan(&uploaderIP, &jwtAccount, &jwtIssuer)
 
 		// no finalized upload exists
 		if err == sql.ErrNoRows {
@@ -259,6 +256,7 @@ func (serv *UploadServer) getSecretForToken(token *jwt.Token) (interface{}, erro
 
 func (serv *UploadServer) processJwt(metadata map[string]string) (err error) {
 	// ensure the client doesn't attempt to specify their own account/issuer fields
+	delete(metadata, "nick")
 	delete(metadata, "issuer")
 	delete(metadata, "account")
 
@@ -281,6 +279,9 @@ func (serv *UploadServer) processJwt(metadata map[string]string) (err error) {
 		return fmt.Errorf("no jwt claims")
 	}
 
+	if nick, ok := claims["sub"].(string); ok {
+		metadata["nick"] = nick
+	}
 	if issuer, ok := claims["iss"].(string); ok {
 		metadata["issuer"] = issuer
 	}

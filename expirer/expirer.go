@@ -3,6 +3,7 @@ package expirer
 import (
 	"time"
 
+	"github.com/kiwiirc/plugin-fileuploader/db"
 	"github.com/kiwiirc/plugin-fileuploader/shardedfilestore"
 	"github.com/rs/zerolog"
 )
@@ -55,7 +56,7 @@ func (expirer *Expirer) gc(t time.Time) {
 		Msg("Filestore GC tick")
 
 	var expiredIds []string
-	err := expirer.store.DBConn.DB.Select(&expiredIds, `
+	err := db.Select(expirer.store.DBConn, &expiredIds, `
 		SELECT id
 		FROM uploads
 		WHERE deleted = 0 AND (

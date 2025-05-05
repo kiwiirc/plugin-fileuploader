@@ -5,14 +5,13 @@ import (
 
 	"github.com/tus/tusd/cmd/tusd/cli/hooks"
 	"github.com/tus/tusd/pkg/handler"
-	tusd "github.com/tus/tusd/pkg/handler"
 )
 
 // how many events can be unread by a listener before everything starts to block
 const bufferSize = 16
 
 type TusEvent struct {
-	Info tusd.FileInfo
+	Info handler.FileInfo
 	Type hooks.HookType
 }
 
@@ -22,7 +21,7 @@ type TusEventBroadcaster struct {
 	quitChan  chan struct{} // closes to signal quitting
 }
 
-func NewTusEventBroadcaster(handler *tusd.UnroutedHandler) *TusEventBroadcaster {
+func NewTusEventBroadcaster(handler *handler.UnroutedHandler) *TusEventBroadcaster {
 	broadcaster := &TusEventBroadcaster{
 		quitChan: make(chan struct{}),
 	}
@@ -58,7 +57,7 @@ func (b *TusEventBroadcaster) Unlisten(listener chan *TusEvent) {
 	b.listeners = b.listeners[:kept]
 }
 
-func (b *TusEventBroadcaster) readLoop(handler *tusd.UnroutedHandler) {
+func (b *TusEventBroadcaster) readLoop(handler *handler.UnroutedHandler) {
 	for {
 		select {
 		case info := <-handler.CompleteUploads:

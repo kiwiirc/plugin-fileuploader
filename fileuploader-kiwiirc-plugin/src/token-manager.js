@@ -62,7 +62,7 @@ export default class TokenManager {
                 cachedPromise.tokenOrPromise = fullToken;
 
                 // Resolve the promise
-                resolve();
+                resolve(fullToken);
             };
 
             this.kiwiApi.on('irc.raw.EXTJWT', callback);

@@ -101,6 +101,33 @@ func (store *ShardedFileStore) initDB() {
 					`ALTER TABLE new_uploads RENAME TO uploads;`,
 				},
 			},
+			{
+				Id: "6",
+				Up: []string{
+					`
+					CREATE TABLE new_uploads(
+						id VARCHAR(36) PRIMARY KEY,
+						uploader_ip VARCHAR(45),
+						sha256sum BLOB,
+						created_at INTEGER,
+						expires_at INTEGER,
+						deleted INTEGER(1) DEFAULT 0 NOT NULL,
+						file_name TEXT DEFAULT '' NOT NULL,
+						file_type TEXT DEFAULT '' NOT NULL,
+						file_size BIGINT DEFAULT -1 NOT NULL,
+						jwt_nick TEXT DEFAULT '' NOT NULL,
+						jwt_account TEXT DEFAULT '' NOT NULL,
+						jwt_issuer TEXT DEFAULT '' NOT NULL
+					);`,
+					`
+					INSERT INTO new_uploads(id, uploader_ip, sha256sum, created_at, expires_at, deleted, jwt_account, jwt_issuer)
+						SELECT id, uploader_ip, sha256sum, created_at, expires_at, deleted, jwt_account, jwt_issuer
+						FROM uploads
+					;`,
+					`DROP TABLE uploads;`,
+					`ALTER TABLE new_uploads RENAME TO uploads;`,
+				},
+			},
 		},
 	}
 

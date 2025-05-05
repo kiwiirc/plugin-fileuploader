@@ -1,11 +1,18 @@
-import { getValidUploadTarget } from '../utils/get-valid-upload-target';
-import { numLines } from '../utils/num-lines';
+import { getValidUploadTarget } from '@/utils/get-valid-upload-target';
+import { numLines } from '@/utils/num-lines';
+
+// import PasteConfirm from '@/components/PasteConfirm.vue';
+
+import * as config from '@/config.js';
 
 export function uploadOnPaste(kiwiApi, uppy, dashboard) {
-    return function handleBufferPaste(event) {
+    return async function handleBufferPaste(event) {
         // swallow error and ignore paste if no valid buffer to share to
         try {
-            getValidUploadTarget(kiwiApi);
+            const buffer = getValidUploadTarget(kiwiApi);
+            if (config.setting('userAccountsOnly') && !buffer.getNetwork().currentUser().account) {
+                return;
+            }
         } catch (err) {
             return;
         }
@@ -20,39 +27,47 @@ export function uploadOnPaste(kiwiApi, uppy, dashboard) {
         // detect large text pastes, offer to create a file upload instead
         const text = cbData.getData('text');
         if (text) {
-            const promptDisabled = kiwiApi.state.setting('fileuploader.textPasteNeverPrompt');
+            const promptDisabled = config.getSetting('textPasteNeverPrompt');
             if (promptDisabled) {
                 return;
             }
-            const minLines = kiwiApi.state.setting('fileuploader.textPastePromptMinimumLines');
+            const minLines = config.getSetting('textPastePromptMinimumLines');
             const network = kiwiApi.state.getActiveNetwork();
             const networkMaxLineLen =
                 network.ircClient.options.message_max_length;
             if (text.length > networkMaxLineLen || numLines(text) >= minLines) {
-                const msg =
-                    'You pasted a lot of text.\nWould you like to upload as a file instead?';
-                if (window.confirm(msg)) {
-                    // stop IrcInput from ingesting the pasted text
-                    event.preventDefault();
-                    event.stopPropagation();
+                // console.log('too may lines', event);
 
-                    // only if there are no other files waiting for user confirmation to upload
-                    const shouldAutoUpload = uppy.getFiles().length === 0;
+                // event.preventDefault();
+                // event.stopPropagation();
 
-                    uppy.addFile({
-                        name: 'pasted.txt',
-                        type: 'text/plain',
-                        data: new Blob([text], { type: 'text/plain' }),
-                        source: 'Local',
-                        isRemote: false,
-                    });
+                // kiwiApi.state.$emit('input.tool', PasteConfirm);
 
-                    if (shouldAutoUpload) {
-                        uppy.upload();
-                    } else {
-                        dashboard.openModal();
-                    }
-                }
+                // const msg =
+                //     'You pasted a lot of text.\nWould you like to upload as a file instead?';
+                // eslint-disable-next-line no-alert
+                // if (window.confirm(msg)) {
+                //     // stop IrcInput from ingesting the pasted text
+                //     event.preventDefault();
+                //     event.stopPropagation();
+
+                //     // only if there are no other files waiting for user confirmation to upload
+                //     const shouldAutoUpload = uppy.getFiles().length === 0;
+
+                //     uppy.addFile({
+                //         name: 'pasted.txt',
+                //         type: 'text/plain',
+                //         data: new Blob([text], { type: 'text/plain' }),
+                //         source: 'Local',
+                //         isRemote: false,
+                //     });
+
+                //     if (shouldAutoUpload) {
+                //         uppy.upload();
+                //     } else {
+                //         dashboard.openModal();
+                //     }
+                // }
             }
 
             return;

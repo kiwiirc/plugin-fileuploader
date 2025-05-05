@@ -11,13 +11,13 @@ export function createPromptUpload({ kiwiApi, tokenManager }) {
         return new Promise((resolve, reject) => {
             const { uppy, dashboard } = instantiateUppy(opts);
 
-            uppy.on('file-added', file => {
+            uppy.on('file-added', (file) => {
                 // needed for acquireExtjwtBeforeUpload
                 file.kiwiFileUploaderTargetBuffer =
                     opts.kiwiApi.state.getActiveNetwork().serverBuffer();
             });
 
-            uppy.on('complete', event => {
+            uppy.on('complete', (event) => {
                 resolve(event);
                 dashboard.closeModal();
             });

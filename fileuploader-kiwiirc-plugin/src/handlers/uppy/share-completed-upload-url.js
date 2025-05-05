@@ -1,5 +1,7 @@
-import { friendlyUrl } from '../../utils/friendly-url';
-import { decodeMetadata } from '../../utils/decode-metadata';
+import { friendlyUrl } from '@/utils/friendly-url';
+import { decodeMetadata } from '@/utils/decode-metadata';
+
+import * as config from '@/config.js';
 
 export function shareCompletedUploadUrl(kiwiApi) {
     return function handleUploadSuccess(file, response) {
@@ -30,7 +32,8 @@ function sendUploadEvent(kiwiApi, url, file, headResp) {
     }
 
     // emit a global kiwi event
-    kiwiApi.emit('fileuploader.uploaded', { url, file, metadata });
+    const event = { url, file, metadata };
+    kiwiApi.emit('fileuploader.uploaded', event);
 
     const buffer = file.kiwiFileUploaderTargetBuffer;
     const tagData = {
@@ -41,8 +44,8 @@ function sendUploadEvent(kiwiApi, url, file, headResp) {
         tagData.expires = parseInt(metadata.expires, 10);
     }
 
-    const msgTemplate = kiwiApi.state.getSetting('settings.fileuploader.uploadMessage');
-    const message = msgTemplate.replace('%URL%', url);
+    const msgTemplate = config.getSetting('uploadMessage');
+    const message = msgTemplate.replace('%URL%', event.url);
 
     buffer.say(message, {
         tags: { '+kiwiirc.com/fileuploader': JSON.stringify(tagData) },

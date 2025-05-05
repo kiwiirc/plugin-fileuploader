@@ -2,16 +2,16 @@ export function decodeMetadata(header) {
     const metadata = Object.create(null);
     const elements = header.split(',');
 
-    for (const element of elements) {
+    elements.forEach((element) => {
         const parts = element.trim().split(' ').filter((p) => !!p);
 
         if (!parts.length || parts.length > 2) {
-            continue;
+            return;
         }
 
         const key = parts[0];
         if (!key) {
-            continue;
+            return;
         }
 
         let value = '';
@@ -19,12 +19,12 @@ export function decodeMetadata(header) {
             try {
                 value = atob(parts[1]);
             } catch {
-                continue;
+                return;
             }
         }
 
         metadata[key] = value;
-    }
+    });
 
     return metadata;
 }

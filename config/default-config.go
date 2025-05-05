@@ -66,6 +66,14 @@ CheckInterval = "5m"
 # "example.com" = "examplesecret"
 # "169.254.0.0" = "anothersecret"
 
+[FileTypes]
+Allowed = [
+	# "image/*"
+]
+Disallowed = [
+	# "image/*"
+]
+
 # PreFinishCommands allows system commands to be run based on minetype once the file is fully uploaded
 # but before it is hashed and moved from incomplete so the file can be rejected using RejectOnNoneZeroExit
 # %FILE% will be replace with the full path to the file within [Storage.Path]/incomplete/

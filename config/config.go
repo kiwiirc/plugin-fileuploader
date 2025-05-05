@@ -31,6 +31,11 @@ type PreFinishCommand struct {
 	RejectOnNoneZeroExit bool
 }
 
+type FileTypes struct {
+	Allowed    []string
+	Disallowed []string
+}
+
 type Config struct {
 	Server struct {
 		ListenAddress             string
@@ -54,6 +59,7 @@ type Config struct {
 		IdentifiedMaxAge duration
 		CheckInterval    duration
 	}
+	FileTypes          FileTypes
 	PreFinishCommands  []PreFinishCommand
 	JwtSecretsByIssuer map[string]string
 	Loggers            []LoggerConfig
@@ -135,7 +141,7 @@ func CreateMultiLogger(loggerConfigs []LoggerConfig) (*zerolog.Logger, error) {
 		url := loggerCfg.Output.URL
 		switch url.Scheme {
 		case "file":
-			file, err := os.OpenFile(url.Path + url.Opaque, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0640)
+			file, err := os.OpenFile(url.Path+url.Opaque, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0640)
 			if err != nil {
 				return nil, err
 			}

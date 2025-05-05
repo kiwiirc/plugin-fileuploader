@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,13 +37,14 @@ import (
 var defaultFilePerm = os.FileMode(0664)
 var defaultDirectoryPerm = os.FileMode(0775)
 
-// ShardedFileStore implements various tusd.DataStore-related interfaces.
+// ShardedFileStore implements various handler.DataStore-related interfaces.
 // See the interfaces for more documentation about the different methods.
 type ShardedFileStore struct {
 	BasePath             string        // Relative or absolute path to store files in.
 	PrefixShardLayers    int           // Number of extra directory layers to prefix file paths with.
 	ExpireTime           time.Duration // How long before an upload expires (seconds)
 	ExpireIdentifiedTime time.Duration // How long before an upload expires with valid account (seconds)
+	FileTypes            config.FileTypes
 	PreFinishCommands    []config.PreFinishCommand
 	DBConn               *db.DatabaseConnection
 	log                  *zerolog.Logger
@@ -52,12 +54,13 @@ type ShardedFileStore struct {
 // be used as the only storage entry. This method does not check
 // whether the path exists, use os.MkdirAll to ensure.
 // In addition, a locking mechanism is provided.
-func New(basePath string, prefixShardLayers int, expireTime, expireIdentifiedTime time.Duration, PreFinishCommands []config.PreFinishCommand, dbConnection *db.DatabaseConnection, log *zerolog.Logger) *ShardedFileStore {
+func New(basePath string, prefixShardLayers int, expireTime, expireIdentifiedTime time.Duration, fileTypes config.FileTypes, PreFinishCommands []config.PreFinishCommand, dbConnection *db.DatabaseConnection, log *zerolog.Logger) *ShardedFileStore {
 	store := &ShardedFileStore{
 		BasePath:             basePath,
 		PrefixShardLayers:    prefixShardLayers,
 		ExpireTime:           expireTime,
 		ExpireIdentifiedTime: expireIdentifiedTime,
+		FileTypes:            fileTypes,
 		PreFinishCommands:    PreFinishCommands,
 		DBConn:               dbConnection,
 		log:                  log,
@@ -102,9 +105,9 @@ func (store ShardedFileStore) NewUpload(ctx context.Context, info handler.FileIn
 	delete(info.MetaData, "RemoteIP")
 
 	// create record in uploads table
-	err = db.UpdateRow(store.DBConn.DB,
-		`INSERT INTO uploads(id, created_at, uploader_ip, jwt_account, jwt_issuer) VALUES (?, ?, ?, ?, ?)`,
-		info.ID, time.Now().Unix(), remoteIP, info.MetaData["account"], info.MetaData["issuer"],
+	err = db.UpdateRow(store.DBConn,
+		`INSERT INTO uploads(id, created_at, uploader_ip, file_name, file_type, jwt_nick, jwt_account, jwt_issuer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		info.ID, time.Now().Unix(), remoteIP, info.MetaData["filename"], info.MetaData["filetype"], info.MetaData["nick"], info.MetaData["account"], info.MetaData["issuer"],
 	)
 	if err != nil {
 		return nil, err
@@ -121,7 +124,7 @@ func (store ShardedFileStore) NewUpload(ctx context.Context, info handler.FileIn
 		return nil, err
 	}
 
-	upload := &fileUpload{
+	upload := &FileUpload{
 		info:     info,
 		store:    store,
 		infoPath: store.infoPath(info.ID),
@@ -137,7 +140,7 @@ func (store ShardedFileStore) NewUpload(ctx context.Context, info handler.FileIn
 	return upload, nil
 }
 
-func (store ShardedFileStore) GetUpload(ctx context.Context, id string) (handler.Upload, error) {
+func (store ShardedFileStore) GetFileUpload(ctx context.Context, id string) (*FileUpload, error) {
 	info := handler.FileInfo{}
 	data, err := ioutil.ReadFile(store.infoPath(id))
 	if err != nil {
@@ -164,7 +167,7 @@ func (store ShardedFileStore) GetUpload(ctx context.Context, id string) (handler
 
 	info.Offset = stat.Size()
 
-	return &fileUpload{
+	return &FileUpload{
 		info:     info,
 		binPath:  binPath,
 		store:    store,
@@ -172,16 +175,20 @@ func (store ShardedFileStore) GetUpload(ctx context.Context, id string) (handler
 	}, nil
 }
 
+func (store ShardedFileStore) GetUpload(ctx context.Context, id string) (handler.Upload, error) {
+	return store.GetFileUpload(ctx, id)
+}
+
 func (store ShardedFileStore) AsTerminatableUpload(upload handler.Upload) handler.TerminatableUpload {
-	return upload.(*fileUpload)
+	return upload.(*FileUpload)
 }
 
 func (store ShardedFileStore) AsLengthDeclarableUpload(upload handler.Upload) handler.LengthDeclarableUpload {
-	return upload.(*fileUpload)
+	return upload.(*FileUpload)
 }
 
 func (store ShardedFileStore) AsConcatableUpload(upload handler.Upload) handler.ConcatableUpload {
-	return upload.(*fileUpload)
+	return upload.(*FileUpload)
 }
 
 // binPath returns the path to the file storing the binary data.
@@ -204,7 +211,7 @@ func (store *ShardedFileStore) infoPath(id string) string {
 	return filepath.Join(store.metaDir(id), id+".info")
 }
 
-type fileUpload struct {
+type FileUpload struct {
 	// info stores the current information about the upload
 	info handler.FileInfo
 	// store the fileupload's store
@@ -215,11 +222,11 @@ type fileUpload struct {
 	binPath string
 }
 
-func (upload *fileUpload) GetInfo(ctx context.Context) (handler.FileInfo, error) {
+func (upload *FileUpload) GetInfo(ctx context.Context) (handler.FileInfo, error) {
 	return upload.info, nil
 }
 
-func (upload *fileUpload) WriteChunk(ctx context.Context, offset int64, src io.Reader) (int64, error) {
+func (upload *FileUpload) WriteChunk(ctx context.Context, offset int64, src io.Reader) (int64, error) {
 	file, err := os.OpenFile(upload.binPath, os.O_WRONLY|os.O_APPEND, defaultFilePerm)
 	if err != nil {
 		return 0, err
@@ -232,15 +239,15 @@ func (upload *fileUpload) WriteChunk(ctx context.Context, offset int64, src io.R
 	return n, err
 }
 
-func (upload *fileUpload) GetReader(ctx context.Context) (io.Reader, error) {
+func (upload *FileUpload) GetReader(ctx context.Context) (io.Reader, error) {
 	return os.Open(upload.binPath)
 }
 
-func (upload *fileUpload) Terminate(ctx context.Context) error {
+func (upload *FileUpload) Terminate(ctx context.Context) error {
 	return upload.store.Terminate(upload.info.ID)
 }
 
-func (upload *fileUpload) ConcatUploads(ctx context.Context, uploads []handler.Upload) (err error) {
+func (upload *FileUpload) ConcatUploads(ctx context.Context, uploads []handler.Upload) (err error) {
 	file, err := os.OpenFile(upload.binPath, os.O_WRONLY|os.O_APPEND, defaultFilePerm)
 	if err != nil {
 		return err
@@ -248,7 +255,7 @@ func (upload *fileUpload) ConcatUploads(ctx context.Context, uploads []handler.U
 	defer file.Close()
 
 	for _, partialUpload := range uploads {
-		fileUpload := partialUpload.(*fileUpload)
+		fileUpload := partialUpload.(*FileUpload)
 
 		src, err := os.Open(fileUpload.binPath)
 		if err != nil {
@@ -263,14 +270,14 @@ func (upload *fileUpload) ConcatUploads(ctx context.Context, uploads []handler.U
 	return
 }
 
-func (upload *fileUpload) DeclareLength(ctx context.Context, length int64) error {
+func (upload *FileUpload) DeclareLength(ctx context.Context, length int64) error {
 	upload.info.Size = length
 	upload.info.SizeIsDeferred = false
 	return upload.writeInfo()
 }
 
 // writeInfo updates the entire information. Everything will be overwritten.
-func (upload *fileUpload) writeInfo() error {
+func (upload *FileUpload) writeInfo() error {
 	data, err := json.Marshal(upload.info)
 	if err != nil {
 		return err
@@ -278,7 +285,7 @@ func (upload *fileUpload) writeInfo() error {
 	return ioutil.WriteFile(upload.infoPath, data, defaultFilePerm)
 }
 
-func (upload *fileUpload) FinishUpload(ctx context.Context) error {
+func (upload *FileUpload) FinishUpload(ctx context.Context) error {
 	upload.store.log.Debug().
 		Str("event", "upload_finished").
 		Str("id", upload.info.ID).Msg("Finishing upload")
@@ -299,6 +306,15 @@ func (upload *fileUpload) FinishUpload(ctx context.Context) error {
 			Msg("Failed resolve path in ExecuteCommands")
 	}
 
+	if ok, detectedType := upload.store.isAllowedFileType(absPath); !ok {
+		upload.store.Terminate(upload.info.ID)
+		upload.store.log.Warn().
+			Err(err).
+			Str("detectedType", detectedType).
+			Msg("Upload has been reject by server")
+		return handler.NewHTTPError(errors.New("Upload has been reject by server"), 406)
+	}
+
 	for _, preFinish := range upload.store.PreFinishCommands {
 		if !wildcard.Match(preFinish.Pattern, fileType) {
 			continue
@@ -309,6 +325,12 @@ func (upload *fileUpload) FinishUpload(ctx context.Context) error {
 			arg = strings.ReplaceAll(arg, "%FILE%", absPath)
 			args = append(args, arg)
 		}
+
+		upload.store.log.Debug().
+			Err(err).
+			Strs("args", args).
+			Str("command", preFinish.Command).
+			Msg("Running pre-finish command")
 
 		cmd := exec.Command(preFinish.Command, args...)
 		var stdOut, stdErr bytes.Buffer
@@ -340,6 +362,18 @@ func (upload *fileUpload) FinishUpload(ctx context.Context) error {
 		return err
 	}
 
+	// update file size
+	stat, err := os.Stat(absPath)
+	if err != nil {
+		upload.store.log.Error().
+			Err(err).
+			Msg("Failed to stat completed upload")
+		return err
+	}
+	size := stat.Size()
+	upload.info.Offset = size
+	upload.info.Size = size
+
 	expires := durationToExpire(upload.store.ExpireTime)
 	if upload.info.MetaData["account"] != "" {
 		expires = durationToExpire(upload.store.ExpireIdentifiedTime)
@@ -347,12 +381,13 @@ func (upload *fileUpload) FinishUpload(ctx context.Context) error {
 	upload.info.MetaData["expires"] = strconv.FormatInt(expires, 10)
 
 	// update hash in uploads table
-	err = db.UpdateRow(upload.store.DBConn.DB, `
+	err = db.UpdateRow(upload.store.DBConn, `
 		UPDATE uploads
 		SET sha256sum = ?,
-		expires_at = ?
+		expires_at = ?,
+		file_size = ?
 		WHERE id = ?
-	`, hash, expires, upload.info.ID)
+	`, hash, expires, size, upload.info.ID)
 	if err != nil {
 		upload.store.log.Error().
 			Err(err).
@@ -375,7 +410,7 @@ func (upload *fileUpload) FinishUpload(ctx context.Context) error {
 				Msg("Failed to rename")
 		}
 	} else {
-		// file already exists just remove the tempoary upload
+		// file already exists just remove the temporary upload
 		err = os.Remove(oldPath)
 		if err != nil {
 			upload.store.log.Error().
@@ -430,7 +465,7 @@ func (store *ShardedFileStore) Terminate(id string) error {
 	}
 
 	// mark upload db record as deleted
-	err = db.UpdateRow(store.DBConn.DB, `
+	err = db.UpdateRow(store.DBConn, `
 		UPDATE uploads
 		SET deleted = 1
 		WHERE id = ?
@@ -479,7 +514,7 @@ func (store *ShardedFileStore) getDuplicateCount(id string) (duplicates int, err
 	}
 
 	// check if there are any other uploads pointing to this file
-	err = store.DBConn.DB.QueryRow(`
+	err = db.QueryRow(store.DBConn, `
 		SELECT count(id)
 		FROM uploads
 		WHERE
@@ -543,8 +578,7 @@ func RemoveWithDirs(path string, basePath string) (err error) {
 // lookupHash translates a randomly generated upload id into its cryptographic
 // hash by querying the upload database.
 func (store *ShardedFileStore) lookupHash(id string) (hash []byte, isFinal bool, err error) {
-	row := store.DBConn.DB.QueryRow(`SELECT sha256sum FROM uploads WHERE id = ?`, id)
-	err = row.Scan(&hash)
+	err = db.QueryRow(store.DBConn, `SELECT sha256sum FROM uploads WHERE id = ?`, id).Scan(&hash)
 
 	// no finalized upload exists
 	if err == sql.ErrNoRows {
@@ -601,6 +635,55 @@ func (store ShardedFileStore) completeBinPath(hashBytes []byte) string {
 	hash := fmt.Sprintf("%x", hashBytes)
 	shards := store.shards(hash)
 	return filepath.Join(store.BasePath, "complete", shards, hash+".bin")
+}
+
+func (store ShardedFileStore) isAllowedFileType(filePath string) (bool, string) {
+	if len(store.FileTypes.Allowed) == 0 && len(store.FileTypes.Disallowed) == 0 {
+		return true, ""
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		store.log.Error().
+			Err(err).
+			Msg("Failed load local file")
+		return false, ""
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 512)
+	_, err = file.Read(buffer)
+	if err != nil {
+		store.log.Error().
+			Err(err).
+			Msg("Failed read local file")
+		return false, ""
+	}
+
+	detectedFileType := http.DetectContentType(buffer)
+
+	allowed := false
+	if len(store.FileTypes.Allowed) > 0 {
+		for _, allow := range store.FileTypes.Allowed {
+			if wildcard.Match(allow, detectedFileType) {
+				allowed = true
+				break
+			}
+		}
+	} else {
+		allowed = true
+	}
+
+	if len(store.FileTypes.Disallowed) > 0 {
+		for _, allow := range store.FileTypes.Allowed {
+			if wildcard.Match(allow, detectedFileType) {
+				allowed = false
+				break
+			}
+		}
+	}
+
+	return allowed, detectedFileType
 }
 
 func durationToExpire(d time.Duration) int64 {
